@@ -1,4 +1,7 @@
 set -e
 
-cmake -B build
-make -C build
+ASSIGNMENT_FOLDER=$(dirname $0)
+BUILD_FOLDER=$ASSIGNMENT_FOLDER/build
+
+cmake -B $BUILD_FOLDER
+make -C $BUILD_FOLDER
