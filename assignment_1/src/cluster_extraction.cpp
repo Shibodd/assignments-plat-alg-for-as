@@ -178,8 +178,13 @@ void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXY
   }
 }
 
+
+#include "../include/args.hpp"
+
 int main(int argc, char *argv[])
 {
+  auto args = parse_args(argc, argv);
+
   Renderer renderer;
   renderer.InitCamera(CameraAngle::XY);
   // Clear viewer
@@ -187,7 +192,7 @@ int main(int argc, char *argv[])
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-  std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"/home/thrun/Desktop/1_lidar/dataset_1"},
+  std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{args.point_cloud_frames_directory},
                                               boost::filesystem::directory_iterator{});
 
   // sort files in ascending (chronological) order
@@ -215,4 +220,6 @@ int main(int argc, char *argv[])
 
     renderer.SpinViewerOnce();
   }
+
+  return 0;
 }
