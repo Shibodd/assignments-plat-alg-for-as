@@ -110,8 +110,6 @@ void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXY
 {
   static logging::Logger logger("ProcessAndRenderPointCloud");
 
-  logger.debug("ProcessAndRenderPointCloud");
-
   // TODO: 1) Downsample the dataset
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane(new pcl::PointCloud<pcl::PointXYZ>());
@@ -216,18 +214,22 @@ int main(int argc, char *argv[])
 
     pcl::PCDReader reader;
     reader.read(streamIterator->string(), *input_cloud);
-    auto startTime = std::chrono::steady_clock::now();
+    logger.debug("Loaded %zu data points from %s.", input_cloud->points.size(), streamIterator->string().c_str());
 
-    ProcessAndRenderPointCloud(renderer, input_cloud);
+    auto startTime = std::chrono::steady_clock::now();
+    // ProcessAndRenderPointCloud(renderer, input_cloud);
+    renderer.RenderPointCloud(input_cloud, "test_pcl");
     auto endTime = std::chrono::steady_clock::now();
+
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    std::cout << "[PointCloudProcessor<PointT>::ReadPcdFile] Loaded "
-              << input_cloud->points.size() << " data points from " << streamIterator->string() << "plane segmentation took " << elapsedTime.count() << " milliseconds" << std::endl;
+    logger.debug("ProcessAndRenderPointCloud took %" PRId64 " milliseconds.", elapsedTime.count());
 
     streamIterator++;
     if (streamIterator == stream.end())
       streamIterator = stream.begin();
 
+    logger.debug("Rendering");
+    renderer.ClearViewer();
     renderer.SpinViewerOnce();
   }
 
