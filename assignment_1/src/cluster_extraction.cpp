@@ -16,6 +16,7 @@
 #include <chrono>
 #include <unordered_set>
 #include "../include/tree_utilities.hpp"
+#include "../include/logging.hpp"
 
 #define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
@@ -107,6 +108,10 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 
 void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
 {
+  static logging::Logger logger("ProcessAndRenderPointCloud");
+
+  logger.debug("ProcessAndRenderPointCloud");
+
   // TODO: 1) Downsample the dataset
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane(new pcl::PointCloud<pcl::PointXYZ>());
@@ -179,11 +184,16 @@ void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXY
 }
 
 
-#include "../include/args.hpp"
+#include "../include/cli.hpp"
 
 int main(int argc, char *argv[])
 {
   auto args = parse_args(argc, argv);
+  logging::setLogLevel(args.logLevel);
+
+  logging::Logger logger("main");
+
+  logger.info("Starting.");
 
   Renderer renderer;
   renderer.InitCamera(CameraAngle::XY);
@@ -221,5 +231,6 @@ int main(int argc, char *argv[])
     renderer.SpinViewerOnce();
   }
 
+  logger.info("Exiting.");
   return 0;
 }

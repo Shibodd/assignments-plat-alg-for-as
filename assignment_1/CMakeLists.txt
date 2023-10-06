@@ -10,5 +10,5 @@ add_definitions(${PCL_DEFINITIONS})
 set (CMAKE_CXX_STANDARD 11)
 
 
-add_executable (cluster_extraction src/cluster_extraction.cpp src/Renderer.cpp)
+add_executable (cluster_extraction src/cluster_extraction.cpp src/Renderer.cpp src/logging.cpp)
 target_link_libraries (cluster_extraction ${PCL_LIBRARIES})
