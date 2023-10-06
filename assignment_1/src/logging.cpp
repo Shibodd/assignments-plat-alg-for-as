@@ -14,5 +14,21 @@ void setLogLevel(int level) {
 }
 #undef LL
 
+void Logger::logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...)
+{
+  if (should_log_at_level(level)) {
+    // Preamble
+    fprintf(stderr, "[%s] %s: ", name.c_str(), levelHumanReadable);
+
+    // Message
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+
+    // Postamble
+    fprintf(stderr, "\n");
+  }
+}
 
 }

@@ -106,20 +106,34 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
   return clusters;
 }
 
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, float lx, float ly, float lz) {
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+
+  pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
+  voxel_grid.setInputCloud (cloud);
+  voxel_grid.setLeafSize(lx, ly, lz); //this value defines how much the PC is filtered
+  voxel_grid.filter (*cloud_filtered);
+
+  return cloud_filtered;
+}
+
 void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
 {
   static logging::Logger logger("ProcessAndRenderPointCloud");
 
   // TODO: 1) Downsample the dataset
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane(new pcl::PointCloud<pcl::PointXYZ>());
+  auto downsampled_pcl = downsampled_point_cloud(cloud, 0.1f, 0.1f, 0.1f);
+  renderer.RenderPointCloud(downsampled_pcl, "downsampled");
+
+  return;
 
   // 2) here we crop the points that are far away from us, in which we are not interested
   pcl::CropBox<pcl::PointXYZ> cb(true);
-  cb.setInputCloud(cloud_filtered);
+  cb.setInputCloud(downsampled_pcl);
   cb.setMin(Eigen::Vector4f(-20, -6, -2, 1));
   cb.setMax(Eigen::Vector4f(30, 7, 5, 1));
-  cb.filter(*cloud_filtered);
+  cb.filter(*downsampled_pcl);
 
   // TODO: 3) Segmentation and apply RANSAC
 
@@ -138,8 +152,8 @@ void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXY
   // Optional assignment
   my_pcl::KdTree treeM;
   treeM.set_dimension(3);
-  setupKdtree(cloud_filtered, &treeM, 3);
-  cluster_indices = euclideanCluster(cloud_filtered, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
+  setupKdtree(downsampled_pcl, &treeM, 3);
+  cluster_indices = euclideanCluster(downsampled_pcl, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
 #endif
 
   std::vector<Color> colors = {Color(1, 0, 0), Color(1, 1, 0), Color(0, 0, 1), Color(1, 0, 1), Color(0, 1, 1)};
@@ -155,7 +169,7 @@ void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXY
   {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
     for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
-      cloud_cluster->push_back((*cloud_filtered)[*pit]);
+      cloud_cluster->push_back((*downsampled_pcl)[*pit]);
     cloud_cluster->width = cloud_cluster->size();
     cloud_cluster->height = 1;
     cloud_cluster->is_dense = true;
@@ -183,11 +197,14 @@ void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXY
 
 
 #include "../include/cli.hpp"
+#include "../include/config.hpp"
+#include <inttypes.h>
 
 int main(int argc, char *argv[])
 {
-  auto args = parse_args(argc, argv);
+  auto args = cli::parse_args(argc, argv);
   logging::setLogLevel(args.logLevel);
+  config::parse_config_file(args.config_file_path);
 
   logging::Logger logger("main");
 
@@ -217,8 +234,8 @@ int main(int argc, char *argv[])
     logger.debug("Loaded %zu data points from %s.", input_cloud->points.size(), streamIterator->string().c_str());
 
     auto startTime = std::chrono::steady_clock::now();
-    // ProcessAndRenderPointCloud(renderer, input_cloud);
-    renderer.RenderPointCloud(input_cloud, "test_pcl");
+    ProcessAndRenderPointCloud(renderer, input_cloud);
+    // renderer.RenderPointCloud(input_cloud, "test_pcl");
     auto endTime = std::chrono::steady_clock::now();
 
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
@@ -228,10 +245,9 @@ int main(int argc, char *argv[])
     if (streamIterator == stream.end())
       streamIterator = stream.begin();
 
-    logger.debug("Rendering");
-    renderer.ClearViewer();
     renderer.SpinViewerOnce();
   }
+
 
   logger.info("Exiting.");
   return 0;

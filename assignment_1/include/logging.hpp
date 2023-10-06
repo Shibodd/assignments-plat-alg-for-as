@@ -7,7 +7,9 @@
 namespace logging {
 
 enum class LogLevel {
-  Info = 0,
+  Disabled = 0,
+  Error = 10,
+  Info = 20,
   Debug = 100
 };
 
@@ -21,34 +23,22 @@ static inline bool should_log_at_level(LogLevel level) {
 class Logger {
   std::string name;
 
-  void logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...) {
-    if (should_log_at_level(level)) {
-      // Preamble
-      fprintf(stderr, "[%s] %s: ", name.c_str(), levelHumanReadable);
-
-      // Message
-      va_list args;
-      va_start(args, fmt);
-      vfprintf(stderr, fmt, args);
-      va_end(args);
-
-      // Postamble
-      fprintf(stderr, "\n");
-    }
-  }
+  void logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...);
 
 public:
   inline Logger(std::string name) : name(name) { }
 
-  template<typename... Args>
-  inline void debug(const char* fmt, Args... args) {
-    logAtLevel(LogLevel::Debug, "DEBUG", fmt, args...);
-  }
+  #define MAKE_LEVEL_METHOD(level_enum, method_name, level_printed) \
+    template<typename... Args> \
+    inline void method_name(const char* fmt, Args... args) { \
+      logAtLevel(level_enum, level_printed, fmt, args...); \
+    }
 
-  template<typename... Args>
-  inline void info(const char* fmt, Args... args) {
-    logAtLevel(LogLevel::Info, "INFO", fmt, args...);
-  }
+  MAKE_LEVEL_METHOD(LogLevel::Info, info, "INFO")
+  MAKE_LEVEL_METHOD(LogLevel::Debug, debug, "DEBUG")
+  MAKE_LEVEL_METHOD(LogLevel::Error, error, "ERROR")
+
+  #undef MAKE_LEVEL_METHOD
 }; // Logger
 
 } // namespace logging
