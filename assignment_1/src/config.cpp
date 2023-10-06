@@ -1,31 +1,31 @@
-#include <iostream>
 #include <functional>
 
 #include "../include/config.hpp"
 #include "../include/logging.hpp"
 #include "../include/ini.hpp"
+#include <boost/lexical_cast.hpp>
 
 template <typename T>
-static void set_or_leave_default(const mINI::INIMap<std::string> &ini, const std::string &key, T &val)
+static void parse_kvp(const mINI::INIMap<std::string> &ini, const std::string &key, T &val)
 {
   static auto logger = logging::Logger("config::set_or_leave_default");
 
   if (ini.has(key))
   {
     const std::string &str_val = ini.get(key);
-    logger.debug("Setting %s to %s.", key.c_str(), str_val.c_str());
-    
-    std::istringstream ss(str_val);
-    ss >> val;
-    if (!ss.good())
-    {
-      logger.error("Parse error!");
+    logger.debug("%s = %s.", key.c_str(), str_val.c_str());
+
+    try {
+      val = boost::lexical_cast<T>(str_val);
+    } catch (boost::bad_lexical_cast& e) {
+      logger.error("Parse error for key %s: %s.", key, e.what());
       exit(1);
     }
   }
   else
   {
-    logger.debug("Key %s not found.", key.c_str());
+    logger.error("Missing key %s.", key.c_str());
+    exit(1);
   }
 }
 
@@ -40,13 +40,14 @@ static void parse_section(const mINI::INIStructure &ini, const std::string &name
   }
   else
   {
-    logger.debug("Section %s not found.", name.c_str());
+    logger.error("Missing section %s.", name.c_str());
+    exit(1);
   }
 }
 
 namespace config
 {
-  config_ty parse_config_file(std::string &path)
+  config_ty parse_config_file(const std::string &path)
   {
     static auto logger = logging::Logger("config::parse_config_file");
     if (path.empty()) {
@@ -68,9 +69,9 @@ namespace config
     config_ty ans;
 
     parse_section(ini, "voxel_filtering", [&ans](mINI::INIMap<std::string> section) {
-      set_or_leave_default(section, "leaf_size_x", ans.voxel_filtering.leaf_size_x);
-      set_or_leave_default(section, "leaf_size_y", ans.voxel_filtering.leaf_size_y);
-      set_or_leave_default(section, "leaf_size_z", ans.voxel_filtering.leaf_size_z); 
+      parse_kvp(section, "leaf_size_x", ans.voxel_filtering.leaf_size_x);
+      parse_kvp(section, "leaf_size_y", ans.voxel_filtering.leaf_size_y);
+      parse_kvp(section, "leaf_size_z", ans.voxel_filtering.leaf_size_z);
     });
 
     return ans;

@@ -17,6 +17,7 @@
 #include <unordered_set>
 #include "../include/tree_utilities.hpp"
 #include "../include/logging.hpp"
+#include "../include/config.hpp"
 
 #define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
@@ -118,12 +119,12 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_point_cloud(pcl::PointCloud<pcl:
   return cloud_filtered;
 }
 
-void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
+void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
 {
   static logging::Logger logger("ProcessAndRenderPointCloud");
 
   // TODO: 1) Downsample the dataset
-  auto downsampled_pcl = downsampled_point_cloud(cloud, 0.1f, 0.1f, 0.1f);
+  auto downsampled_pcl = downsampled_point_cloud(cloud, cfg.voxel_filtering.leaf_size_x, cfg.voxel_filtering.leaf_size_y, cfg.voxel_filtering.leaf_size_z);
   renderer.RenderPointCloud(downsampled_pcl, "downsampled");
 
   return;
@@ -197,17 +198,17 @@ void ProcessAndRenderPointCloud(Renderer &renderer, pcl::PointCloud<pcl::PointXY
 
 
 #include "../include/cli.hpp"
-#include "../include/config.hpp"
 #include <inttypes.h>
 
 int main(int argc, char *argv[])
 {
-  auto args = cli::parse_args(argc, argv);
+  // CLI and configuration parsing.
+  const auto args = cli::parse_args(argc, argv);
   logging::setLogLevel(args.logLevel);
-  config::parse_config_file(args.config_file_path);
+
+  const auto cfg = config::parse_config_file(args.config_file_path);
 
   logging::Logger logger("main");
-
   logger.info("Starting.");
 
   Renderer renderer;
@@ -234,7 +235,7 @@ int main(int argc, char *argv[])
     logger.debug("Loaded %zu data points from %s.", input_cloud->points.size(), streamIterator->string().c_str());
 
     auto startTime = std::chrono::steady_clock::now();
-    ProcessAndRenderPointCloud(renderer, input_cloud);
+    ProcessAndRenderPointCloud(cfg, renderer, input_cloud);
     // renderer.RenderPointCloud(input_cloud, "test_pcl");
     auto endTime = std::chrono::steady_clock::now();
 
