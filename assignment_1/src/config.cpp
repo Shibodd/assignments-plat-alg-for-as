@@ -68,11 +68,18 @@ namespace config
 
     config_ty ans;
 
-    parse_section(ini, "voxel_filtering", [&ans](mINI::INIMap<std::string> section) {
-      parse_kvp(section, "leaf_size_x", ans.voxel_filtering.leaf_size_x);
-      parse_kvp(section, "leaf_size_y", ans.voxel_filtering.leaf_size_y);
-      parse_kvp(section, "leaf_size_z", ans.voxel_filtering.leaf_size_z);
-    });
+    // I'm sorry
+    #define PARSE_FIELD(name) parse_kvp(section, #name, section_data.name)
+    #define PARSE_SECTION(name, fields) parse_section(ini, #name, [&ans](mINI::INIMap<std::string> section) { \
+      auto& section_data = ans.name; \
+      fields \
+    })
+
+    PARSE_SECTION(voxel_filtering,
+      PARSE_FIELD(leaf_size_x);
+      PARSE_FIELD(leaf_size_y);
+      PARSE_FIELD(leaf_size_z);
+    );
 
     return ans;
   }
