@@ -5,6 +5,7 @@
 //
 
 #include "../include/Renderer.hpp"
+#include "../include/logging.hpp"
 
 
 namespace lidar_obstacle_detection
@@ -101,15 +102,19 @@ namespace lidar_obstacle_detection
   void Renderer::RenderPointCloud(
       const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, const std::string& name, const Color& color)
   {
+    static logging::Logger logger("RenderPointCloud");
+    logger.debug("Rendering cloud %s consisting of %zu points.", name.c_str(), cloud->size());
 
     viewer_->addPointCloud<pcl::PointXYZ>(cloud, name);
-    viewer_->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, name);
+    viewer_->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, name);
     viewer_->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, color.r, color.g, color.b, name);
   }
 
   void Renderer::RenderPointCloud(
       const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud, const std::string& name, const Color& color)
   {
+    static logging::Logger logger("RenderPointCloud");
+    logger.debug("Rendering cloud %s consisting of %zu points.", name.c_str(), cloud->size());
 
     if(color.r==-1)
     {
@@ -154,7 +159,7 @@ namespace lidar_obstacle_detection
                                         pcl::visualization::PCL_VISUALIZER_REPRESENTATION_SURFACE, cubeFill);
 
     viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, color.r, color.g, color.b, cubeFill);
-
+                                        
     viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, opacity*0.3, cubeFill);
   }
 
