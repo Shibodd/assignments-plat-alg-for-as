@@ -81,6 +81,17 @@ namespace config
       PARSE_FIELD(leaf_size_z);
     );
 
+    PARSE_SECTION(plane_removal,
+      PARSE_FIELD(distance_threshold);
+      PARSE_FIELD(sac_iterations);
+    );
+
+    PARSE_SECTION(crop_cloud,
+      PARSE_FIELD(min_x); PARSE_FIELD(min_y); PARSE_FIELD(min_z);
+      PARSE_FIELD(max_x); PARSE_FIELD(max_y); PARSE_FIELD(max_z);
+    );
+
+
     return ans;
   }
 

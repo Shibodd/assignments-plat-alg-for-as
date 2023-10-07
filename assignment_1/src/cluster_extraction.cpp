@@ -108,37 +108,83 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 }
 
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, float lx, float ly, float lz) {
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+void downsample_point_cloud(pcl::PointCloud<pcl::PointXYZ>::ConstPtr src, pcl::PointCloud<pcl::PointXYZ>::Ptr dst, float lx, float ly, float lz) {
+  static logging::Logger logger("downsample_point_cloud");
+  size_t old_size = src->size();
 
   pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
-  voxel_grid.setInputCloud (cloud);
-  voxel_grid.setLeafSize(lx, ly, lz); //this value defines how much the PC is filtered
-  voxel_grid.filter (*cloud_filtered);
+  voxel_grid.setInputCloud(src);
+  voxel_grid.setLeafSize(lx, ly, lz);
+  voxel_grid.filter(*dst);
 
-  return cloud_filtered;
+  logger.debug("Downsampled cloud from %zu points to %zu.", old_size, dst->size());
 }
+
+void crop_point_cloud(pcl::PointCloud<pcl::PointXYZ>::ConstPtr src, pcl::PointCloud<pcl::PointXYZ>::Ptr dst, Eigen::Vector4f min, Eigen::Vector4f max) {
+  static logging::Logger logger("crop_point_cloud");
+  size_t old_size = src->size();
+
+  pcl::CropBox<pcl::PointXYZ> crop_box(true);
+  crop_box.setInputCloud(src);
+  crop_box.setMin(min);
+  crop_box.setMax(max);
+  crop_box.filter(*dst);
+
+  logger.debug("Cropped cloud from %zu points to %zu.", old_size, dst->size());
+}
+
+void plane_removal(pcl::PointCloud<pcl::PointXYZ>::ConstPtr src, pcl::PointCloud<pcl::PointXYZ>::Ptr dst, int ransac_iter, float distance_thresh) {
+  static logging::Logger logger("plane_removal");
+  size_t old_size = src->size();
+
+  pcl::SACSegmentation<pcl::PointXYZ> seg;
+  seg.setOptimizeCoefficients(true);
+  seg.setModelType(pcl::SACMODEL_PLANE);
+  seg.setMethodType(pcl::SAC_RANSAC);
+  seg.setMaxIterations(ransac_iter);
+  seg.setDistanceThreshold(distance_thresh);
+  seg.setInputCloud(src);
+
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices ()); 
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients ());
+  seg.segment(*inliers, *coefficients);
+
+  pcl::ExtractIndices<pcl::PointXYZ> extract;
+  extract.setInputCloud(src); 
+  extract.setIndices(inliers);
+  extract.setNegative(true);
+
+  extract.filter(*dst);
+
+  if (inliers->indices.size() <= 0) {
+    logger.debug("No plane detected.");
+  } else {
+    logger.debug("Removed a plane. From %zu points to %zu.", old_size, dst->size());
+  }
+}
+
 
 void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
 {
   static logging::Logger logger("ProcessAndRenderPointCloud");
 
-  // TODO: 1) Downsample the dataset
-  auto downsampled_pcl = downsampled_point_cloud(cloud, cfg.voxel_filtering.leaf_size_x, cfg.voxel_filtering.leaf_size_y, cfg.voxel_filtering.leaf_size_z);
-  renderer.RenderPointCloud(downsampled_pcl, "downsampled");
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_pcl(new pcl::PointCloud<pcl::PointXYZ>);
 
-  return;
+  // 1) Downsample the dataset
+  downsample_point_cloud(cloud, filtered_pcl, cfg.voxel_filtering.leaf_size_x, cfg.voxel_filtering.leaf_size_y, cfg.voxel_filtering.leaf_size_z);
 
   // 2) here we crop the points that are far away from us, in which we are not interested
-  pcl::CropBox<pcl::PointXYZ> cb(true);
-  cb.setInputCloud(downsampled_pcl);
-  cb.setMin(Eigen::Vector4f(-20, -6, -2, 1));
-  cb.setMax(Eigen::Vector4f(30, 7, 5, 1));
-  cb.filter(*downsampled_pcl);
+  crop_point_cloud(filtered_pcl, filtered_pcl,
+    Eigen::Vector4f(cfg.crop_cloud.min_x, cfg.crop_cloud.min_y, cfg.crop_cloud.min_z, 1),
+    Eigen::Vector4f(cfg.crop_cloud.max_x, cfg.crop_cloud.max_y, cfg.crop_cloud.max_z, 1)
+  );
 
-  // TODO: 3) Segmentation and apply RANSAC
+  // 3) Segmentation and apply RANSAC
+  // 4) iterate over the filtered cloud, segment and remove the planar inliers
+  plane_removal(filtered_pcl, filtered_pcl, cfg.plane_removal.sac_iterations, cfg.plane_removal.distance_threshold);
 
-  // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers
+  renderer.RenderPointCloud(filtered_pcl, "downsampled");
+  return;
 
   // TODO: 5) Create the KDTree and the vector of PointIndices
 
@@ -153,8 +199,8 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
   // Optional assignment
   my_pcl::KdTree treeM;
   treeM.set_dimension(3);
-  setupKdtree(downsampled_pcl, &treeM, 3);
-  cluster_indices = euclideanCluster(downsampled_pcl, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
+  setupKdtree(filtered_pcl, &treeM, 3);
+  cluster_indices = euclideanCluster(filtered_pcl, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
 #endif
 
   std::vector<Color> colors = {Color(1, 0, 0), Color(1, 1, 0), Color(0, 0, 1), Color(1, 0, 1), Color(0, 1, 1)};
@@ -170,7 +216,7 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
   {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
     for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
-      cloud_cluster->push_back((*downsampled_pcl)[*pit]);
+      cloud_cluster->push_back((*filtered_pcl)[*pit]);
     cloud_cluster->width = cloud_cluster->size();
     cloud_cluster->height = 1;
     cloud_cluster->is_dense = true;
