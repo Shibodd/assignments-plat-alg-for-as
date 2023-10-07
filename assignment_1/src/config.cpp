@@ -76,21 +76,35 @@ namespace config
     })
 
     PARSE_SECTION(voxel_filtering,
+      PARSE_FIELD(enable);
       PARSE_FIELD(leaf_size_x);
       PARSE_FIELD(leaf_size_y);
       PARSE_FIELD(leaf_size_z);
     );
 
-    PARSE_SECTION(plane_removal,
+    PARSE_SECTION(ground_removal,
+      PARSE_FIELD(enable);
       PARSE_FIELD(distance_threshold);
       PARSE_FIELD(sac_iterations);
+      PARSE_FIELD(ground_offset);
     );
 
     PARSE_SECTION(crop_cloud,
+      PARSE_FIELD(enable);
       PARSE_FIELD(min_x); PARSE_FIELD(min_y); PARSE_FIELD(min_z);
       PARSE_FIELD(max_x); PARSE_FIELD(max_y); PARSE_FIELD(max_z);
     );
 
+    PARSE_SECTION(remove_ego_vehicle,
+      PARSE_FIELD(enable);
+      PARSE_FIELD(min_x); PARSE_FIELD(min_y); PARSE_FIELD(min_z);
+      PARSE_FIELD(max_x); PARSE_FIELD(max_y); PARSE_FIELD(max_z);
+    );
+
+    PARSE_SECTION(test,
+      PARSE_FIELD(value1);
+      PARSE_FIELD(value2);
+    );
 
     return ans;
   }

@@ -3,6 +3,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/passthrough.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/sample_consensus/method_types.h>
@@ -108,59 +109,132 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 }
 
 
-void downsample_point_cloud(pcl::PointCloud<pcl::PointXYZ>::ConstPtr src, pcl::PointCloud<pcl::PointXYZ>::Ptr dst, float lx, float ly, float lz) {
+void downsample_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty& cfg) {
   static logging::Logger logger("downsample_point_cloud");
-  size_t old_size = src->size();
+  if (not cfg.voxel_filtering.enable) {
+    logger.debug("Downsampling is disabled.");
+    return;
+  }
+
+  size_t old_size = cloud->size();
 
   pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
-  voxel_grid.setInputCloud(src);
-  voxel_grid.setLeafSize(lx, ly, lz);
-  voxel_grid.filter(*dst);
+  voxel_grid.setInputCloud(cloud);
+  voxel_grid.setLeafSize(cfg.voxel_filtering.leaf_size_x, cfg.voxel_filtering.leaf_size_y, cfg.voxel_filtering.leaf_size_z);
+  voxel_grid.filter(*cloud);
 
-  logger.debug("Downsampled cloud from %zu points to %zu.", old_size, dst->size());
+  logger.debug("Downsampled cloud from %zu points to %zu.", old_size, cloud->size());
 }
 
-void crop_point_cloud(pcl::PointCloud<pcl::PointXYZ>::ConstPtr src, pcl::PointCloud<pcl::PointXYZ>::Ptr dst, Eigen::Vector4f min, Eigen::Vector4f max) {
+void crop_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty& cfg) {
   static logging::Logger logger("crop_point_cloud");
-  size_t old_size = src->size();
+  if (not cfg.crop_cloud.enable) {
+    logger.debug("Cloud cropping is disabled.");
+    return;
+  }
 
-  pcl::CropBox<pcl::PointXYZ> crop_box(true);
-  crop_box.setInputCloud(src);
-  crop_box.setMin(min);
-  crop_box.setMax(max);
-  crop_box.filter(*dst);
+  size_t old_size = cloud->size();
 
-  logger.debug("Cropped cloud from %zu points to %zu.", old_size, dst->size());
+  pcl::CropBox<pcl::PointXYZ> crop_box;
+  crop_box.setInputCloud(cloud);
+  crop_box.setMin(Eigen::Vector4f(cfg.crop_cloud.min_x, cfg.crop_cloud.min_y, cfg.crop_cloud.min_z, 1));
+  crop_box.setMax(Eigen::Vector4f(cfg.crop_cloud.max_x, cfg.crop_cloud.max_y, cfg.crop_cloud.max_z, 1));
+  crop_box.filter(*cloud);
+
+  logger.debug("Cropped cloud from %zu points to %zu.", old_size, cloud->size());
 }
 
-void plane_removal(pcl::PointCloud<pcl::PointXYZ>::ConstPtr src, pcl::PointCloud<pcl::PointXYZ>::Ptr dst, int ransac_iter, float distance_thresh) {
-  static logging::Logger logger("plane_removal");
-  size_t old_size = src->size();
+void remove_ego_vehicle(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty& cfg) {
+  static logging::Logger logger("remove_ego_vehicle");
+  if (not cfg.remove_ego_vehicle.enable) {
+    logger.debug("Removing ego vehicle is disabled.");
+    return;
+  }
 
+  size_t old_size = cloud->size();
+  
+  pcl::CropBox<pcl::PointXYZ> crop_box;
+  crop_box.setInputCloud(cloud);
+  crop_box.setMin(Eigen::Vector4f(cfg.remove_ego_vehicle.min_x, cfg.remove_ego_vehicle.min_y, cfg.remove_ego_vehicle.min_z, 1));
+  crop_box.setMax(Eigen::Vector4f(cfg.remove_ego_vehicle.max_x, cfg.remove_ego_vehicle.max_y, cfg.remove_ego_vehicle.max_z, 1));
+  crop_box.setNegative(true);
+  crop_box.filter(*cloud);
+
+  logger.debug("Removed ego vehicle from cloud - from %zu points to %zu.", old_size, cloud->size());
+}
+
+void ground_removal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty &cfg, pcl::PointCloud<pcl::PointXYZ>::Ptr ground = 0) {
+  static logging::Logger logger("ground_removal");
+  if (not cfg.ground_removal.enable) {
+    logger.debug("Plane removal is disabled.");
+    return;
+  }
+
+  size_t old_size = cloud->size();
+
+  /*
+    I observed that using too high values for distanceThreshold results in a plane that is too high,
+    and therefore some points below the plane are not considered inliers.
+    This doesn't make any sense - once we've found a plane that represents the ground,
+    anything below it should be considered ground.
+    
+    Fit a plane with RANSAC, then filter out any point below the plane.
+  */
   pcl::SACSegmentation<pcl::PointXYZ> seg;
-  seg.setOptimizeCoefficients(true);
+  
+  // This just recomputes the plane coefficients to find the best fit for the already found inliers
+  // seg.setOptimizeCoefficients(true); 
+
+  seg.setOptimizeCoefficients(false);
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
-  seg.setMaxIterations(ransac_iter);
-  seg.setDistanceThreshold(distance_thresh);
-  seg.setInputCloud(src);
+  seg.setMaxIterations(cfg.ground_removal.sac_iterations);
+  seg.setDistanceThreshold(cfg.ground_removal.distance_threshold);
+  seg.setInputCloud(cloud);
 
-  pcl::PointIndices::Ptr inliers(new pcl::PointIndices ()); 
-  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients ());
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices ());  
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
+
   seg.segment(*inliers, *coefficients);
-
-  pcl::ExtractIndices<pcl::PointXYZ> extract;
-  extract.setInputCloud(src); 
-  extract.setIndices(inliers);
-  extract.setNegative(true);
-
-  extract.filter(*dst);
-
   if (inliers->indices.size() <= 0) {
-    logger.debug("No plane detected.");
-  } else {
-    logger.debug("Removed a plane. From %zu points to %zu.", old_size, dst->size());
+    logger.warn("No ground plane detected!");
+    return;
   }
+  /*
+  pcl::ExtractIndices<pcl::PointXYZ> extract;
+  extract.setInputCloud(cloud); 
+  extract.setIndices(inliers);
+  extract.setNegative(false);
+  extract.filter(*ground);
+*/
+
+  /* To filter stuff below the plane, we might use the PassThrough filter, but we'd have to rotate the pointcloud
+     Just assume the plane is horizontal, which should work given that the area is decently flat.
+     In that case, normal.X and normal.Y are near to zero.
+  */
+  float normal_z = coefficients->values[2];
+  if (fabs(normal_z) <= 0.95f) {
+    // Just warn the user, but go on
+    logger.warn("Ground plane is not horizontal! Cosine: %f", normal_z);
+  }
+
+
+  float height = coefficients->values[3];
+  // Flip the sign if the plane normal points up instead of down
+  height *= -copysign(1.0f, normal_z);
+
+  pcl::PassThrough<pcl::PointXYZ> pass_through;
+  pass_through.setInputCloud(cloud);
+  pass_through.setFilterFieldName("z");
+  // "pull" the plane up by ground_offset, then filter all points below it
+  pass_through.setFilterLimits(height + cfg.ground_removal.ground_offset, FLT_MAX);
+  
+  pass_through.setNegative(true);
+  pass_through.filter(*ground);
+  pass_through.setNegative(false);
+  pass_through.filter(*cloud);
+  
+  logger.debug("Removed ground. From %zu points to %zu.", old_size, cloud->size());
 }
 
 
@@ -168,22 +242,25 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
 {
   static logging::Logger logger("ProcessAndRenderPointCloud");
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_pcl(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_pcl(new pcl::PointCloud<pcl::PointXYZ>(*cloud));
 
-  // 1) Downsample the dataset
-  downsample_point_cloud(cloud, filtered_pcl, cfg.voxel_filtering.leaf_size_x, cfg.voxel_filtering.leaf_size_y, cfg.voxel_filtering.leaf_size_z);
+  // 1) here we crop the points that are far away from us, in which we are not interested
+  crop_point_cloud(filtered_pcl, cfg);
 
-  // 2) here we crop the points that are far away from us, in which we are not interested
-  crop_point_cloud(filtered_pcl, filtered_pcl,
-    Eigen::Vector4f(cfg.crop_cloud.min_x, cfg.crop_cloud.min_y, cfg.crop_cloud.min_z, 1),
-    Eigen::Vector4f(cfg.crop_cloud.max_x, cfg.crop_cloud.max_y, cfg.crop_cloud.max_z, 1)
-  );
+  // 1.1) Also remove points that are too close to the ego vehicle
+  remove_ego_vehicle(filtered_pcl, cfg);
+
+  // 2) Downsample the dataset
+  downsample_point_cloud(filtered_pcl, cfg);
 
   // 3) Segmentation and apply RANSAC
   // 4) iterate over the filtered cloud, segment and remove the planar inliers
-  plane_removal(filtered_pcl, filtered_pcl, cfg.plane_removal.sac_iterations, cfg.plane_removal.distance_threshold);
 
+  pcl::PointCloud<pcl::PointXYZ>::Ptr ground(new pcl::PointCloud<pcl::PointXYZ>());
+  ground_removal(filtered_pcl, cfg, ground);
+  
   renderer.RenderPointCloud(filtered_pcl, "downsampled");
+  // renderer.RenderPointCloud(ground, "ground", lidar_obstacle_detection::Color(1, 0, 0));
   return;
 
   // TODO: 5) Create the KDTree and the vector of PointIndices
@@ -289,8 +366,10 @@ int main(int argc, char *argv[])
     logger.debug("ProcessAndRenderPointCloud took %" PRId64 " milliseconds.", elapsedTime.count());
 
     streamIterator++;
-    if (streamIterator == stream.end())
+    if (streamIterator == stream.end()) {
+      logging::setLogLevel(logging::LogLevel::Info);
       streamIterator = stream.begin();
+    }
 
     renderer.SpinViewerOnce();
   }
