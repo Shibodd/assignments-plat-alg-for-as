@@ -4,10 +4,14 @@ namespace logging {
 
 LogLevel logLevel;
 void setLogLevel(LogLevel level) {
-  logLevel = level;
+  static Logger logger("setLogLevel");
+  if (logLevel != level) {
+    logLevel = level;
+    logger.info("Log level changed to %d.", static_cast<unsigned int>(logLevel));
+  }
 }
 
-#define LL(lvl_enum) if (level >= static_cast<int>(lvl_enum)) { logLevel = lvl_enum; return; }
+#define LL(lvl_enum) if (level >= static_cast<unsigned int>(lvl_enum)) { setLogLevel(lvl_enum); return; }
 void setLogLevel(int level) {
   LL(LogLevel::Debug);
   LL(LogLevel::Info);
@@ -16,6 +20,10 @@ void setLogLevel(int level) {
   logLevel = LogLevel::Info;
 }
 #undef LL
+
+static inline bool should_log_at_level(LogLevel level) {
+  return static_cast<unsigned int>(logLevel) >= static_cast<unsigned int>(level);
+}
 
 void Logger::logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...)
 {

@@ -17,10 +17,6 @@ enum class LogLevel {
 extern LogLevel logLevel;
 void setLogLevel(LogLevel level);
 
-static inline bool should_log_at_level(LogLevel level) {
-  return static_cast<unsigned int>(logLevel) >= static_cast<unsigned int>(LogLevel::Info);
-}
-
 class Logger {
   std::string name;
 
