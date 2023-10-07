@@ -10,6 +10,9 @@ void setLogLevel(LogLevel level) {
 #define LL(lvl_enum) if (level >= static_cast<int>(lvl_enum)) { logLevel = lvl_enum; return; }
 void setLogLevel(int level) {
   LL(LogLevel::Debug);
+  LL(LogLevel::Info);
+  LL(LogLevel::Warn);
+  LL(LogLevel::Error);
   logLevel = LogLevel::Info;
 }
 #undef LL

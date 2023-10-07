@@ -9,7 +9,8 @@ namespace logging {
 enum class LogLevel {
   Disabled = 0,
   Error = 10,
-  Info = 20,
+  Warn = 20,
+  Info = 30,
   Debug = 100
 };
 
@@ -37,6 +38,7 @@ public:
   MAKE_LEVEL_METHOD(LogLevel::Info, info, "INFO")
   MAKE_LEVEL_METHOD(LogLevel::Debug, debug, "DEBUG")
   MAKE_LEVEL_METHOD(LogLevel::Error, error, "ERROR")
+  MAKE_LEVEL_METHOD(LogLevel::Warn, warn, "WARN")
 
   #undef MAKE_LEVEL_METHOD
 }; // Logger
