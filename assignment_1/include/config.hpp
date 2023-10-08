@@ -35,6 +35,13 @@ namespace config
       float max_x; float max_y; float max_z;
     } remove_ego_vehicle;
 
+    struct
+    {
+      float tolerance;
+      int min_size;
+      int max_size;
+    } clustering;
+
     struct {
       float value1;
       float value2;

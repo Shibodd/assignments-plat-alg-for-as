@@ -101,6 +101,12 @@ namespace config
       PARSE_FIELD(max_x); PARSE_FIELD(max_y); PARSE_FIELD(max_z);
     );
 
+    PARSE_SECTION(clustering,
+      PARSE_FIELD(tolerance);
+      PARSE_FIELD(min_size);
+      PARSE_FIELD(max_size);
+    );
+
     PARSE_SECTION(test,
       PARSE_FIELD(value1);
       PARSE_FIELD(value2);
