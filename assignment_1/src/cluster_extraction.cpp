@@ -166,25 +166,23 @@ void remove_ego_vehicle(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config:
 void ground_removal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty &cfg, pcl::PointCloud<pcl::PointXYZ>::Ptr ground = 0) {
   static logging::Logger logger("ground_removal");
   if (not cfg.ground_removal.enable) {
-    logger.debug("Plane removal is disabled.");
+    logger.debug("Ground removal is disabled.");
     return;
   }
 
   size_t old_size = cloud->size();
 
   /*
-    I observed that using too high values for distanceThreshold results in a plane that is too high,
+    I observed that using too high values for distanceThreshold results in a plane that is too high (in terms of Z coordinate),
     and therefore some points below the plane are not considered inliers.
     This doesn't make any sense - once we've found a plane that represents the ground,
     anything below it should be considered ground.
     
     Fit a plane with RANSAC, then filter out any point below the plane.
   */
-  pcl::SACSegmentation<pcl::PointXYZ> seg;
   
-  // This just recomputes the plane coefficients to find the best fit for the already found inliers
-  // seg.setOptimizeCoefficients(true); 
-
+  pcl::SACSegmentation<pcl::PointXYZ> seg;
+  // If true, after finding the plane with the most inliers, it would fit a new plane to the previously found inliers - we don't need it
   seg.setOptimizeCoefficients(false);
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
@@ -200,17 +198,11 @@ void ground_removal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::con
     logger.warn("No ground plane detected!");
     return;
   }
-  /*
-  pcl::ExtractIndices<pcl::PointXYZ> extract;
-  extract.setInputCloud(cloud); 
-  extract.setIndices(inliers);
-  extract.setNegative(false);
-  extract.filter(*ground);
-*/
 
-  /* To filter stuff below the plane, we might use the PassThrough filter, but we'd have to rotate the pointcloud
-     Just assume the plane is horizontal, which should work given that the area is decently flat.
-     In that case, normal.X and normal.Y are near to zero.
+  /* To filter stuff below the plane, we will use the PassThrough filter,
+     but in the general case we'd have to rotate the pointcloud to make the plane horizontal.
+     Just assume the plane is already horizontal, which should work given that the area is decently flat.
+     In that case, normal.X and normal.Y are near to zero, and normal.Z is near either -1 or 1
   */
   float normal_z = coefficients->values[2];
   if (fabs(normal_z) <= 0.95f) {
@@ -218,19 +210,21 @@ void ground_removal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::con
     logger.warn("Ground plane is not horizontal! Cosine: %f", normal_z);
   }
 
-
   float height = coefficients->values[3];
-  // Flip the sign if the plane normal points up instead of down
-  height *= -copysign(1.0f, normal_z);
+  // Flip the sign if the plane normal points down instead of up
+  height *= copysign(1.0f, normal_z);
 
   pcl::PassThrough<pcl::PointXYZ> pass_through;
   pass_through.setInputCloud(cloud);
   pass_through.setFilterFieldName("z");
-  // "pull" the plane up by ground_offset, then filter all points below it
-  pass_through.setFilterLimits(height + cfg.ground_removal.ground_offset, FLT_MAX);
+  // "pull" the plane up by ground_offset
+  pass_through.setFilterLimits(cfg.ground_removal.ground_offset - height, FLT_MAX);
   
-  pass_through.setNegative(true);
-  pass_through.filter(*ground);
+  // Apply the filter
+  if (ground != 0) {
+    pass_through.setNegative(true);
+    pass_through.filter(*ground);
+  }
   pass_through.setNegative(false);
   pass_through.filter(*cloud);
   
@@ -255,16 +249,17 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
 
   // 3) Segmentation and apply RANSAC
   // 4) iterate over the filtered cloud, segment and remove the planar inliers
-
+  ground_removal(filtered_pcl, cfg);
+  /*
   pcl::PointCloud<pcl::PointXYZ>::Ptr ground(new pcl::PointCloud<pcl::PointXYZ>());
   ground_removal(filtered_pcl, cfg, ground);
+  renderer.RenderPointCloud(ground, "ground", lidar_obstacle_detection::Color(1, 0, 0));
+  */
   
-  renderer.RenderPointCloud(filtered_pcl, "downsampled");
-  // renderer.RenderPointCloud(ground, "ground", lidar_obstacle_detection::Color(1, 0, 0));
-  return;
-
   // TODO: 5) Create the KDTree and the vector of PointIndices
 
+  renderer.RenderPointCloud(filtered_pcl, "downsampled");
+  return;
   // TODO: 6) Set the spatial tolerance for new cluster candidates (pay attention to the tolerance!!!)
   std::vector<pcl::PointIndices> cluster_indices;
 
