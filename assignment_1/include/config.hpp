@@ -19,6 +19,7 @@ namespace config
       int sac_iterations;
       float distance_threshold;
       float ground_offset;
+      bool render_ground;
     } ground_removal;
 
     struct
@@ -37,6 +38,7 @@ namespace config
 
     struct
     {
+      bool enable;
       float tolerance;
       int min_size;
       int max_size;

@@ -35,6 +35,11 @@ void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdT
   }
 }
 
+
+Eigen::Vector3f v3f(pcl::PointXYZ pt) {
+  return Eigen::Vector3f(pt.x, pt.y, pt.z);
+}
+
 /*
 OPTIONAL
 This function computes the nearest neighbors and builds the clusters
@@ -152,7 +157,7 @@ void remove_ego_vehicle(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config:
   }
 
   size_t old_size = cloud->size();
-  
+
   pcl::CropBox<pcl::PointXYZ> crop_box;
   crop_box.setInputCloud(cloud);
   crop_box.setMin(Eigen::Vector4f(cfg.remove_ego_vehicle.min_x, cfg.remove_ego_vehicle.min_y, cfg.remove_ego_vehicle.min_z, 1));
@@ -241,14 +246,21 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
   crop_point_cloud(filtered_pcl, cfg);
   remove_ego_vehicle(filtered_pcl, cfg);
   downsample_point_cloud(filtered_pcl, cfg);
-  ground_removal(filtered_pcl, cfg);
 
-  /*
-  pcl::PointCloud<pcl::PointXYZ>::Ptr ground(new pcl::PointCloud<pcl::PointXYZ>());
-  ground_removal(filtered_pcl, cfg, ground);
-  renderer.RenderPointCloud(ground, "ground", lidar_obstacle_detection::Color(1, 0, 0));
-  */
-  
+  if (cfg.ground_removal.render_ground) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr ground(new pcl::PointCloud<pcl::PointXYZ>());
+    ground_removal(filtered_pcl, cfg, ground);
+    renderer.RenderPointCloud(ground, "ground", lidar_obstacle_detection::Color(1, 0, 0));
+  } else {
+    ground_removal(filtered_pcl, cfg);
+  }
+
+  if (!cfg.clustering.enable) {
+    logger.debug("Clustering is disabled.");
+    renderer.RenderPointCloud(filtered_pcl, "filtered", lidar_obstacle_detection::Color(1, 1, 1));
+    return;
+  }
+
   // Clustering
   std::vector<pcl::PointIndices> cluster_indices;
 #ifdef USE_PCL_LIBRARY
@@ -307,17 +319,22 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
 
     renderer.RenderPointCloud(cloud_cluster, "cluster" + std::to_string(clusterId), colors[clusterId % colors.size()]);
 
-    // Here we create the bounding box on the detected clusters
+    // Create a cluster bounding box
     pcl::PointXYZ minPt, maxPt;
     pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
 
-    // TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
     Box box{minPt.x, minPt.y, minPt.z,
             maxPt.x, maxPt.y, maxPt.z};
-    
-    // TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
-    // please take a look at the function RenderBox to see how to color the box
     renderer.RenderBox(box, clusterId);
+  
+
+    // Display the distance to the cluster
+    Eigen::Vector3f midPt = (v3f(maxPt) + v3f(minPt)) / 2;
+    float distance = midPt.norm();
+
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(2) << midPt.norm();
+    renderer.addText(ss.str(), midPt.x(), midPt.y(), midPt.z(), "txtDist" + std::to_string(clusterId));
 
     ++clusterId;
   }
@@ -363,7 +380,6 @@ int main(int argc, char *argv[])
 
     auto startTime = std::chrono::steady_clock::now();
     ProcessAndRenderPointCloud(cfg, renderer, input_cloud);
-    //renderer.RenderPointCloud(input_cloud, "test_pcl");
     auto endTime = std::chrono::steady_clock::now();
 
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);

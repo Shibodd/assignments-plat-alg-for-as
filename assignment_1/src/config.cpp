@@ -87,6 +87,7 @@ namespace config
       PARSE_FIELD(distance_threshold);
       PARSE_FIELD(sac_iterations);
       PARSE_FIELD(ground_offset);
+      PARSE_FIELD(render_ground);
     );
 
     PARSE_SECTION(crop_cloud,
@@ -102,6 +103,7 @@ namespace config
     );
 
     PARSE_SECTION(clustering,
+      PARSE_FIELD(enable);
       PARSE_FIELD(tolerance);
       PARSE_FIELD(min_size);
       PARSE_FIELD(max_size);
