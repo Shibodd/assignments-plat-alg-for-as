@@ -211,7 +211,7 @@ void clustering(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud, std::vector<pcl:
   if (clusters.size() == 0) {
     logger.warn("Found no clusters!");
   } else {
-    logger.info("Found %" PRId64 " clusters.");
+    logger.info("Found %" PRId64 " clusters.", clusters.size());
   }
 }
 

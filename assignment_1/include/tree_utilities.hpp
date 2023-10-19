@@ -32,11 +32,11 @@ class KdTree
 		return std::unique_ptr<Node>(new Node(parent, point, id));
 	}
 
-	void insert(Node* parent, Eigen::Vector3f point, int id, int depth) {
-		int index = get_split_by_index(depth);
+	void insert(Node* parent, Eigen::Vector3f point, int id) {
+		for (int depth = 0; ; ++depth) {
+			int index = get_split_by_index(depth);
 
-		while (true) {
-			if (point[index] <= parent->point[index]) {
+			if (point[index] < parent->point[index]) {
 				// Left side
 				if (parent->left == nullptr) {
 					parent->left = create_node(parent, point, id);
@@ -71,7 +71,7 @@ public:
 		if (root == nullptr)
 			root = create_node(nullptr, point, id);
 		else
-			insert(root.get(), point, id, 0);
+			insert(root.get(), point, id);
 	}
 };
 }
