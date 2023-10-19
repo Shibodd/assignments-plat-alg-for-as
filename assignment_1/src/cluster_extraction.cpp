@@ -19,6 +19,8 @@
 #include "../include/tree_utilities.hpp"
 #include "../include/logging.hpp"
 #include "../include/config.hpp"
+#include "../include/cli.hpp"
+#include <inttypes.h>
 
 #define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
@@ -347,10 +349,6 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
     ++clusterId;
   }
 }
-
-
-#include "../include/cli.hpp"
-#include <inttypes.h>
 
 int main(int argc, char *argv[])
 {
