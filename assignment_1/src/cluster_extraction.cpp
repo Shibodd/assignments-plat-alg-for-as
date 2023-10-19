@@ -22,7 +22,7 @@
 #include "../include/cli.hpp"
 #include <inttypes.h>
 
-#define USE_PCL_LIBRARY
+// #define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
 
 typedef std::unordered_set<int> my_visited_set_t;
@@ -78,30 +78,30 @@ This function computes the nearest neighbors and builds the clusters
         + visited: already visited points
         + cluster: at the end of this function we will have one cluster
 */
-void proximity(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int target_ndx, my_pcl::KdTree *tree, float distanceTol, my_visited_set_t &visited, std::vector<int> &cluster, int max)
+void proximity(typename pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud, int target_ndx, const my_pcl::KdTree *tree, float distanceTol, my_visited_set_t &visited, std::vector<int> &cluster, int max)
 {
-  if (cluster.size() < max)
+  static const logging::Logger logger("proximity");
+
+  logger.debug("Proximity");
+
+  cluster.push_back(target_ndx);
+  visited.insert(target_ndx);
+
+  std::vector<float> point{cloud->at(target_ndx).x, cloud->at(target_ndx).y, cloud->at(target_ndx).z};
+  std::vector<int> neighbours_indices = tree->search(point, distanceTol);
+
+
+  for (int neighborNdx : neighborNdxs)
   {
-    cluster.push_back(target_ndx);
-    visited.insert(target_ndx);
-
-    std::vector<float> point{cloud->at(target_ndx).x, cloud->at(target_ndx).y, cloud->at(target_ndx).z};
-
-    // get all neighboring indices of point
-    std::vector<int> neighborNdxs = tree->search(point, distanceTol);
-
-    for (int neighborNdx : neighborNdxs)
+    // if point was not visited
+    if (visited.find(neighborNdx) == visited.end())
     {
-      // if point was not visited
-      if (visited.find(neighborNdx) == visited.end())
-      {
-        proximity(cloud, neighborNdx, tree, distanceTol, visited, cluster, max);
-      }
 
-      if (cluster.size() >= max)
-      {
-        return;
-      }
+    }
+
+    if (cluster.size() >= max)
+    {
+      return;
     }
   }
 }
@@ -119,26 +119,37 @@ This function builds the clusters following a euclidean clustering approach
         + cluster: at the end of this function we will have a set of clusters
 TODO: Complete the function
 */
-std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree *tree, float distanceTol, int setMinClusterSize, int setMaxClusterSize)
+std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud, const my_pcl::KdTree *tree, const config::config_ty& cfg)
 {
+  static const logging::Logger logger("euclideanCluster");
+
   my_visited_set_t visited{};              // already visited points
   std::vector<pcl::PointIndices> clusters; // vector of PointIndices that will contain all the clusters
   std::vector<int> cluster;                // vector of int that is used to store the points that the function proximity will give me back
-  // for every point of the cloud
-  //   if the point has not been visited (use the function called "find")
-  //     find clusters using the proximity function
-  //
-  //     if we have more clusters than the minimum
-  //       Create the cluster and insert it in the vector of clusters. You can extract the indices from the cluster returned by the proximity funciton (use pcl::PointIndices)
-  //     end if
-  //   end if
-  // end for
+
+  for (int i = 0; i < cloud->size(); ++i) {
+    if (visited.find(i) != visited.end()) {
+      continue;
+    }
+
+    cluster.clear();
+    proximity(cloud, i, tree, cfg.clustering.tolerance, visited, cluster, cfg.clustering.max_size);
+
+    if (cluster.size() < cfg.clustering.min_size) {
+      logger.debug("Ignoring cluster of %" PRId64 " points.", cluster.size());
+      continue;
+    }
+
+    clusters.emplace_back();
+    std::copy(cluster.begin(), cluster.end(), clusters.back().indices.begin());
+    logger.debug("Added cluster of %" PRId64 " points.", cluster.size());
+  }
   return clusters;
 }
 
 
 void downsample_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty& cfg) {
-  static logging::Logger logger("downsample_point_cloud");
+  static const logging::Logger logger("downsample_point_cloud");
   if (not cfg.voxel_filtering.enable) {
     logger.debug("Downsampling is disabled.");
     return;
@@ -155,7 +166,7 @@ void downsample_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const con
 }
 
 void crop_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty& cfg) {
-  static logging::Logger logger("crop_point_cloud");
+  static const logging::Logger logger("crop_point_cloud");
   if (not cfg.crop_cloud.enable) {
     logger.debug("Cloud cropping is disabled.");
     return;
@@ -173,7 +184,7 @@ void crop_point_cloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::c
 }
 
 void remove_ego_vehicle(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty& cfg) {
-  static logging::Logger logger("remove_ego_vehicle");
+  static const logging::Logger logger("remove_ego_vehicle");
   if (not cfg.remove_ego_vehicle.enable) {
     logger.debug("Removing ego vehicle is disabled.");
     return;
@@ -192,7 +203,7 @@ void remove_ego_vehicle(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config:
 }
 
 void ground_removal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::config_ty &cfg, pcl::PointCloud<pcl::PointXYZ>::Ptr ground = 0) {
-  static logging::Logger logger("ground_removal");
+  static const logging::Logger logger("ground_removal");
   if (not cfg.ground_removal.enable) {
     logger.debug("Ground removal is disabled.");
     return;
@@ -262,7 +273,7 @@ void ground_removal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::con
 
 void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
 {
-  static logging::Logger logger("ProcessAndRenderPointCloud");
+  static const logging::Logger logger("ProcessAndRenderPointCloud");
 
   // Point cloud preprocessing
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_pcl(new pcl::PointCloud<pcl::PointXYZ>(*cloud));
@@ -303,7 +314,7 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
   my_pcl::KdTree treeM;
   treeM.set_dimension(3);
   setupKdtree(filtered_pcl, &treeM, 3);
-  cluster_indices = euclideanCluster(filtered_pcl, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
+  cluster_indices = euclideanCluster(filtered_pcl, &treeM, cfg);
 #endif
 
   if (cluster_indices.size() == 0) {

@@ -102,7 +102,7 @@ namespace lidar_obstacle_detection
   void Renderer::RenderPointCloud(
       const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, const std::string& name, const Color& color)
   {
-    static logging::Logger logger("RenderPointCloud");
+    static const logging::Logger logger("RenderPointCloud");
     logger.debug("Rendering cloud %s consisting of %zu points.", name.c_str(), cloud->size());
 
     viewer_->addPointCloud<pcl::PointXYZ>(cloud, name);
@@ -113,7 +113,7 @@ namespace lidar_obstacle_detection
   void Renderer::RenderPointCloud(
       const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud, const std::string& name, const Color& color)
   {
-    static logging::Logger logger("RenderPointCloud");
+    static const logging::Logger logger("RenderPointCloud");
     logger.debug("Rendering cloud %s consisting of %zu points.", name.c_str(), cloud->size());
 
     if(color.r==-1)

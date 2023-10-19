@@ -20,14 +20,14 @@ void setLogLevel(LogLevel level);
 class Logger {
   std::string name;
 
-  void logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...);
+  void logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...) const;
 
 public:
   inline Logger(std::string name) : name(name) { }
 
   #define MAKE_LEVEL_METHOD(level_enum, method_name, level_printed) \
     template<typename... Args> \
-    inline void method_name(const char* fmt, Args... args) { \
+    inline void method_name(const char* fmt, Args... args) const { \
       logAtLevel(level_enum, level_printed, fmt, args...); \
     }
 

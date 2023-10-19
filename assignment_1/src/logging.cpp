@@ -25,7 +25,7 @@ static inline bool should_log_at_level(LogLevel level) {
   return static_cast<unsigned int>(logLevel) >= static_cast<unsigned int>(level);
 }
 
-void Logger::logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...)
+void Logger::logAtLevel(LogLevel level, const char* levelHumanReadable, const char* fmt, ...) const
 {
   if (should_log_at_level(level)) {
     // Preamble
