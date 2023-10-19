@@ -7,63 +7,44 @@ inline Eigen::Vector3f v3f(pcl::PointXYZ pt) {
   return Eigen::Vector3f(pt.x, pt.y, pt.z);
 }
 
-static void proximity(
+static void neighbourhood(
   Eigen::Vector3f point,
   const my_kdtree::Node* node,
-  std::vector<int>& cluster_indices,
-  float threshold)
+  std::vector<int>& neighbour_indices,
+  std::set<int>& taken,
+  float threshold,
+  int depth = 0)
 {
-  static const logging::Logger logger("proximity");
+  static const logging::Logger logger("neighbourhood");
 
   /* Perform a Depth-first traversal of the tree to add any point that is close enough. */
+  if ((node->point - point).norm() <= threshold)
+    neighbour_indices.push_back(node->id);
 
-  int depth = 0;
-  std::stack<int> stack;
-  stack.push(0);
+  int dimension_idx = depth % 3;
+  float cut_pos = node->point[dimension_idx];
+  float point_pos = point[dimension_idx];
 
-  while (stack.size() > 0) {
-    // If the node is close enough, add it to the cluster
-    if ((node->point - point).norm() <= threshold)
-      cluster_indices.push_back(node->id);
+  if (node->left && point_pos - threshold <= cut_pos) {
+    neighbourhood(point, node->left.get(), neighbour_indices, taken, threshold, depth + 1);
+  }
+  if (node->right && point_pos + threshold >= cut_pos) {
+    neighbourhood(point, node->right.get(), neighbour_indices, taken, threshold, depth + 1);
+  }
+}
 
-    // Depth-first traversal
-    int cut_dimension = depth % my_kdtree::DIMENSIONS;
-    int& traversal_flag = stack.top();
-    
+static void cluster_flood_fill(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& cloud, const my_kdtree::KdTree& kdtree, int index, std::vector<int>& cluster, std::set<int>& taken, const config::config_ty& cfg) {
+  // Too big clusters should result in no clusters
+  if (cluster.size() <= cfg.clustering.max_size)
+    cluster.push_back(index);
+  taken.insert(index);
 
-    // The traversal flag marks whether we need to visit left (0), right (1) or we're done (2).
-    // Here it's always either 0 or 1.
-    bool descending = false;
-    for (; traversal_flag < 2; ++traversal_flag) {
-      const my_kdtree::Node* child = traversal_flag == 0? node->left.get() : node->right.get();
+  std::vector<int> neighbour_indices;
+  neighbourhood(v3f(cloud->at(index)), kdtree.root.get(), neighbour_indices, taken, cfg.clustering.tolerance);
 
-      if (child == nullptr)
-        continue;
-
-      float cut_pos = child->point[cut_dimension];
-      float pt_pos = point[cut_dimension];
-
-      bool left = traversal_flag == 0 && pt_pos - threshold <= cut_pos;
-      bool right = traversal_flag == 1 && pt_pos + threshold >= cut_pos;
-
-      if (left || right) {
-        // Then we need to search on this side of the hyperplane
-        ++traversal_flag;
-
-        // From the next iteration...
-        node = child;  // ... we'll start traversing this child
-        stack.push(0); // ... starting at the left node
-        descending = true;
-        ++depth;
-        break;
-      }
-    }
-
-    if (!descending && traversal_flag >= 2) {
-      // We traversed both left and right - this node's done, so ascend
-      node = node->parent; // unwind the recursion
-      stack.pop(); // remove our traversal flag
-      --depth;
+  for (int neighbour_index : neighbour_indices) {
+    if (taken.find(neighbour_index) == taken.end()) {
+      cluster_flood_fill(cloud, kdtree, neighbour_index, cluster, taken, cfg);
     }
   }
 }
@@ -90,11 +71,7 @@ void euclideanClustering(
       auto& cluster = clusters.back();
 
       // Compute the cluster
-      proximity(v3f(cloud->at(i)), kdtree.root.get(), cluster.indices, cfg.clustering.tolerance);
-
-      // Add the cluster to the taken set
-      for (int index : cluster.indices)
-        taken.insert(index);
+      cluster_flood_fill(cloud, kdtree, i, cluster.indices, taken, cfg);  
 
       // If the cluster is invalid, throw it away
       if (cluster.indices.size() <= cfg.clustering.min_size || cluster.indices.size() > cfg.clustering.max_size) {
