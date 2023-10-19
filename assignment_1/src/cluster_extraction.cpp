@@ -28,12 +28,12 @@ using namespace lidar_obstacle_detection;
 typedef std::unordered_set<int> my_visited_set_t;
 
 // This function sets up the custom kdtree using the point cloud
-void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree *tree, int dimension)
+void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_kdtree::KdTree *tree, int dimension)
 {
   // insert point cloud points into tree
   for (int i = 0; i < cloud->size(); ++i)
   {
-    tree->insert({cloud->at(i).x, cloud->at(i).y, cloud->at(i).z}, i);
+    tree->insert(v3f(cloud->at(i)));
   }
 }
 
@@ -61,90 +61,6 @@ bool is_pcl_in_front(pcl::PointCloud<pcl::PointXYZ>::ConstPtr pcl) {
   return std::any_of(pcl->begin(), pcl->end(), [](pcl::PointXYZ pt) {
     return pt.x > 0;
   });
-}
-
-/*
-OPTIONAL
-This function computes the nearest neighbors and builds the clusters
-    - Input:
-        + cloud: Point cloud to be explored
-        + target_ndx: i-th point to visit
-        + tree: kd tree for searching neighbors
-        + distanceTol: Distance tolerance to build the clusters
-        + visited: Visited points --> typedef std::unordered_set<int> my_visited_set_t;
-        + cluster: Here we add points that will represent the cluster
-        + max: Max cluster size
-    - Output:
-        + visited: already visited points
-        + cluster: at the end of this function we will have one cluster
-*/
-void proximity(typename pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud, int target_ndx, const my_pcl::KdTree *tree, float distanceTol, my_visited_set_t &visited, std::vector<int> &cluster, int max)
-{
-  static const logging::Logger logger("proximity");
-
-  logger.debug("Proximity");
-
-  cluster.push_back(target_ndx);
-  visited.insert(target_ndx);
-
-  std::vector<float> point{cloud->at(target_ndx).x, cloud->at(target_ndx).y, cloud->at(target_ndx).z};
-  std::vector<int> neighbours_indices = tree->search(point, distanceTol);
-
-
-  for (int neighborNdx : neighborNdxs)
-  {
-    // if point was not visited
-    if (visited.find(neighborNdx) == visited.end())
-    {
-
-    }
-
-    if (cluster.size() >= max)
-    {
-      return;
-    }
-  }
-}
-
-/*
-OPTIONAL
-This function builds the clusters following a euclidean clustering approach
-    - Input:
-        + cloud: Point cloud to be explored
-        + tree: kd tree for searching neighbors
-        + distanceTol: Distance tolerance to build the clusters
-        + setMinClusterSize: Minimum cluster size
-        + setMaxClusterSize: Max cluster size
-    - Output:
-        + cluster: at the end of this function we will have a set of clusters
-TODO: Complete the function
-*/
-std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud, const my_pcl::KdTree *tree, const config::config_ty& cfg)
-{
-  static const logging::Logger logger("euclideanCluster");
-
-  my_visited_set_t visited{};              // already visited points
-  std::vector<pcl::PointIndices> clusters; // vector of PointIndices that will contain all the clusters
-  std::vector<int> cluster;                // vector of int that is used to store the points that the function proximity will give me back
-
-  for (int i = 0; i < cloud->size(); ++i) {
-    if (visited.find(i) != visited.end()) {
-      continue;
-    }
-
-    cluster.clear();
-    proximity(cloud, i, tree, cfg.clustering.tolerance, visited, cluster, cfg.clustering.max_size);
-
-    if (cluster.size() < cfg.clustering.min_size) {
-      logger.debug("Ignoring cluster of %" PRId64 " points.", cluster.size());
-      continue;
-    }
-
-    clusters.emplace_back();
-    std::copy(cluster.begin(), cluster.end(), clusters.back().indices.begin());
-    logger.debug("Added cluster of %" PRId64 " points.", cluster.size());
-  }
-  return clusters;
 }
 
 
@@ -311,7 +227,7 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
   ec.extract(cluster_indices);
 #else
   // Optional assignment
-  my_pcl::KdTree treeM;
+  my_kdtree::KdTree treeM;
   treeM.set_dimension(3);
   setupKdtree(filtered_pcl, &treeM, 3);
   cluster_indices = euclideanCluster(filtered_pcl, &treeM, cfg);
