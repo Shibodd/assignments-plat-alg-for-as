@@ -23,7 +23,7 @@
 #include <inttypes.h>
 #include "../include/my_clustering.hpp"
 
-// #define USE_PCL_LIBRARY
+#define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
 
 inline Eigen::Vector3f v3f(pcl::PointXYZ pt) {
@@ -33,7 +33,7 @@ inline Eigen::Vector3f v3f(pcl::PointXYZ pt) {
 // This function sets up the custom kdtree using the point cloud
 void setupKdtree(pcl::PointCloud<pcl::PointXYZ>::ConstPtr& cloud, my_kdtree::KdTree& tree)
 {
-  // insert point cloud points into tree
+  // TODO: Build the tree properly - this is useless and you'd probably be better off not using the tree at all
   for (int i = 0; i < cloud->size(); ++i)
   {
     tree.insert(v3f(cloud->at(i)), i);
