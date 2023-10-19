@@ -1,0 +1,10 @@
+Dataset 2 presents many objects which can easily be false-positives.
+
+For example, the pillars at the sides of the road are correctly clustered,
+but they don't present a distinct enough geometry to allow filtering with simple algorithms.
+
+An idea that came up was filtering clusters by volume: cars and vans have a remarkably high volume,
+so an attempt was made at filtering out all clusters which have a volume below a certain threshold.
+Unfortunately, the dataset also presents a bicycle and a walking person which, using such an approach, would not be detected.
+
+Moreover, wall filtering is not addressed in my solution nor would be addressed by the above idea.
