@@ -36,8 +36,29 @@ void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdT
 }
 
 
-Eigen::Vector3f v3f(pcl::PointXYZ pt) {
+inline Eigen::Vector3f v3f(pcl::PointXYZ pt) {
   return Eigen::Vector3f(pt.x, pt.y, pt.z);
+}
+
+float get_pcl_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr pcl) {
+  float min_distance = std::numeric_limits<float>::max();
+
+  auto end = pcl->end();
+  for (auto ii = pcl->begin(); ii != end; ++ii) {
+    float distance2 = v3f(*ii).squaredNorm();
+    if (distance2 < min_distance) {
+      min_distance = distance2;
+    }
+  }
+
+  return std::sqrt(min_distance);
+}
+
+bool is_pcl_in_front(pcl::PointCloud<pcl::PointXYZ>::ConstPtr pcl) {
+  // Ego vehicle forward vector is always (1, 0, 0)
+  return std::any_of(pcl->begin(), pcl->end(), [](pcl::PointXYZ pt) {
+    return pt.x > 0;
+  });
 }
 
 /*
@@ -287,37 +308,26 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
     logger.info("Found no clusters!");
   }
 
-  // Render each cluster as a separate point cloud
-  const std::vector<Color> colors = { 
-    Color(0, 0, 1),
-    Color(0, 1, 0),
-    Color(0, 1, 1),
-    Color(1, 0, 0),
-    Color(1, 0, 1),
-    Color(1, 1, 0)
-  };
-
-  /*
-   Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices.
-
-   To separate each cluster out of the vector<PointIndices> we have to iterate through cluster_indices, create a new PointCloud for each entry and write all points of the current cluster in the PointCloud.
-   Compute euclidean distance
-  */
-
-  renderer.RenderPointCloud(filtered_pcl, "filtered");
-
   int clusterId = 0;
   for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
   {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
-    for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
+    for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit) {
       cloud_cluster->push_back((*filtered_pcl)[*pit]);
+    }
       
     cloud_cluster->width = cloud_cluster->size();
     cloud_cluster->height = 1;
     cloud_cluster->is_dense = true;
 
-    renderer.RenderPointCloud(cloud_cluster, "cluster" + std::to_string(clusterId), colors[clusterId % colors.size()]);
+    float distance = get_pcl_distance(cloud_cluster);
+
+    Color color(1.0f, 1.0f, 1.0f);
+    if (distance <= 5.0f && is_pcl_in_front(cloud_cluster)) {
+      color = Color(1.0f, 0.0f, 0.0f);
+    }
+
+    renderer.RenderPointCloud(cloud_cluster, "cluster" + std::to_string(clusterId), color);
 
     // Create a cluster bounding box
     pcl::PointXYZ minPt, maxPt;
@@ -330,10 +340,8 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
 
     // Display the distance to the cluster
     Eigen::Vector3f midPt = (v3f(maxPt) + v3f(minPt)) / 2;
-    float distance = midPt.norm();
-
     std::ostringstream ss;
-    ss << std::fixed << std::setprecision(2) << midPt.norm();
+    ss << std::fixed << std::setprecision(2) << distance;
     renderer.addText(ss.str(), midPt.x(), midPt.y(), midPt.z(), "txtDist" + std::to_string(clusterId));
 
     ++clusterId;
