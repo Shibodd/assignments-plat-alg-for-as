@@ -21,26 +21,25 @@
 #include "../include/config.hpp"
 #include "../include/cli.hpp"
 #include <inttypes.h>
+#include "../include/my_clustering.hpp"
 
 // #define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
 
-typedef std::unordered_set<int> my_visited_set_t;
+inline Eigen::Vector3f v3f(pcl::PointXYZ pt) {
+  return Eigen::Vector3f(pt.x, pt.y, pt.z);
+}
 
 // This function sets up the custom kdtree using the point cloud
-void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_kdtree::KdTree *tree, int dimension)
+void setupKdtree(pcl::PointCloud<pcl::PointXYZ>::ConstPtr& cloud, my_kdtree::KdTree& tree)
 {
   // insert point cloud points into tree
   for (int i = 0; i < cloud->size(); ++i)
   {
-    tree->insert(v3f(cloud->at(i)));
+    tree.insert(v3f(cloud->at(i)), i);
   }
 }
 
-
-inline Eigen::Vector3f v3f(pcl::PointXYZ pt) {
-  return Eigen::Vector3f(pt.x, pt.y, pt.z);
-}
 
 float get_pcl_distance(pcl::PointCloud<pcl::PointXYZ>::ConstPtr pcl) {
   float min_distance = std::numeric_limits<float>::max();
@@ -187,6 +186,36 @@ void ground_removal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const config::con
 }
 
 
+void clustering(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud, std::vector<pcl::PointIndices>& clusters, const config::config_ty& cfg) {
+  static const logging::Logger logger("clustering");
+
+#ifdef USE_PCL_LIBRARY
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+  tree->setInputCloud(cloud);
+
+  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+  ec.setClusterTolerance(cfg.clustering.tolerance);
+  ec.setMinClusterSize(cfg.clustering.min_size);
+  ec.setMaxClusterSize(cfg.clustering.max_size);
+  ec.setSearchMethod(tree);
+  ec.setInputCloud(cloud);
+
+  ec.extract(clusters);
+#else
+  my_kdtree::KdTree kdtree;
+  setupKdtree(cloud, kdtree);
+
+  my_clustering::euclideanClustering(clusters, cloud, kdtree, cfg);
+#endif
+
+  if (clusters.size() == 0) {
+    logger.warn("Found no clusters!");
+  } else {
+    logger.info("Found %" PRId64 " clusters.");
+  }
+}
+
+
 void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
 {
   static const logging::Logger logger("ProcessAndRenderPointCloud");
@@ -211,34 +240,11 @@ void ProcessAndRenderPointCloud(const config::config_ty& cfg, Renderer &renderer
     return;
   }
 
-  // Clustering
-  std::vector<pcl::PointIndices> cluster_indices;
-#ifdef USE_PCL_LIBRARY
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
-  tree->setInputCloud(filtered_pcl);
-
-  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-  ec.setClusterTolerance(cfg.clustering.tolerance);
-  ec.setMinClusterSize(cfg.clustering.min_size);
-  ec.setMaxClusterSize(cfg.clustering.max_size);
-  ec.setSearchMethod(tree);
-  ec.setInputCloud(filtered_pcl);
-
-  ec.extract(cluster_indices);
-#else
-  // Optional assignment
-  my_kdtree::KdTree treeM;
-  treeM.set_dimension(3);
-  setupKdtree(filtered_pcl, &treeM, 3);
-  cluster_indices = euclideanCluster(filtered_pcl, &treeM, cfg);
-#endif
-
-  if (cluster_indices.size() == 0) {
-    logger.info("Found no clusters!");
-  }
+  std::vector<pcl::PointIndices> clusters;
+  clustering(filtered_pcl, clusters, cfg);
 
   int clusterId = 0;
-  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
+  for (std::vector<pcl::PointIndices>::const_iterator it = clusters.begin(); it != clusters.end(); ++it)
   {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
     for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit) {

@@ -1,4 +1,7 @@
 /* \author Aaron Brown */
+#ifndef TREE_UTILITIES_HPP
+#define TREE_UTILITIES_HPP
+
 
 #include "Renderer.hpp"
 #include <Eigen/Geometry>
@@ -72,3 +75,6 @@ public:
 	}
 };
 }
+
+
+#endif // !TREE_UTILITIES_HPP
