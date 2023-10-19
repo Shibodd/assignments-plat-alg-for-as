@@ -1,3 +1,10 @@
+USAGE:
+build with "./build.sh" 
+Run with "./run.sh", or refer to "./build/cluster_extraction -h"
+Also refer to "./config.ini" to edit the algorithm parameters.
+
+====================
+
 * Assignment #1 Euclidean clustering object detection:
     - Objective: Find and segment cars and pedestrians lying on the road
         + 1) Implement an euclidean clustering program using the PCL library as studied during the lectures. Please follow the instructions and comments detailed in the code (cluster_extraction.cpp)
