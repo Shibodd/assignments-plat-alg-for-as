@@ -3,9 +3,16 @@
 #include "viewer/Renderer.h"
 #include "tracker/Tracker.h"
 #include "CloudManager.h"
+#include "logging.hpp"
+#include <inttypes.h>
+#include <chrono>
+
+const logging::Logger logger("main");
 
 int main(int argc, char *argv[])
 {
+    logging::setLogLevel(logging::LogLevel::Debug);
+
     int64_t freq = 100;            // Frequency of the thread dedicated to process the point cloud
     std::string log_path = "log";  // TODO: define the path to the log folder
 
@@ -35,6 +42,8 @@ int main(int argc, char *argv[])
 
         while (!lidar_cloud.new_measurement)
             ; // wait for new data (we will execute the following code each 100ms)
+        
+        auto start_time = std::chrono::steady_clock::now();
 
         // fetch data
         lidar_cloud.mtxData.lock();
@@ -63,6 +72,10 @@ int main(int argc, char *argv[])
         }
 
         renderer.spinViewerOnce();
+
+        auto end_time = std::chrono::steady_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        logger.debug("Frame took %" PRId64 "ms - Trackers: %zu", elapsed_time.count(), tracks.size());
     }
 
     t.join();
