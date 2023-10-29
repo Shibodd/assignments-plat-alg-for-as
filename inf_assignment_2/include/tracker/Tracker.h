@@ -40,7 +40,6 @@ private:
   // thresholds
   double distance_threshold_;
   double covariance_threshold;
-  int loss_threshold;
 };
 
 #endif // TRACKER_H_

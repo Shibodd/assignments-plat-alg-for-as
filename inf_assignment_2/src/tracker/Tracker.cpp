@@ -4,9 +4,9 @@ Tracker::Tracker()
 {
     cur_id_ = 0;
     distance_threshold_ = 0.0; // meters
-    covariance_threshold = 0.0; 
-    loss_threshold = 0; //number of frames the track has not been seen
+    covariance_threshold = 0.0;
 }
+
 Tracker::~Tracker()
 {
 }
