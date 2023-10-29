@@ -22,6 +22,7 @@ file(GLOB tracker-SRC   "src/tracker/KalmanFilter.cpp"
                         "src/viewer/Renderer.cpp"
                         "src/CloudManager.cpp"
                         "src/logging.cpp"
+                        "src/tracker/rectangular_lsap.cpp"
                         )
 set(tracker-LIBS ${PCL_LIBRARIES} pthread)
 add_library(tracker SHARED ${tracker-SRC})

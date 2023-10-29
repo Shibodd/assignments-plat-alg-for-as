@@ -19,4 +19,4 @@ inline double mahalanobis2(
 }
 
 } // namespace gauss
-#endif GAUSS_HPP
+#endif // !GAUSS_HPP

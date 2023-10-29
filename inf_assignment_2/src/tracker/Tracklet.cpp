@@ -8,9 +8,6 @@ Tracklet::Tracklet(int idTrack, double x, double y)
   // initialize filter
   kf_.init(0.1);
   kf_.setState(x, y);
-
-  // set loss count to 0
-  loss_count_ = 0;
 }
 
 Tracklet::~Tracklet()
@@ -21,19 +18,17 @@ Tracklet::~Tracklet()
 void Tracklet::predict()
 {
   kf_.predict();
-  loss_count_++;
 }
 
 // Update with a real measurement
 void Tracklet::update(double x, double y, bool lidarStatus)
 {
-  Eigen::VectorXd raw_measurements_ = Eigen::VectorXd(2);
+  Eigen::Vector2d raw_measurements_ = Eigen::Vector2d(2);
 
   // measurement update
   if (lidarStatus)
   {
     raw_measurements_ << x, y;
     kf_.update(raw_measurements_);
-    loss_count_ = 0;
   }
 }

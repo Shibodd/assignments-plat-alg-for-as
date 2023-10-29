@@ -97,14 +97,9 @@ void Tracker::track(const std::vector<double> &centroids_x,
     associated_detections[det_id] = true;
   }
 
-  // TODO: Remove dead tracklets
+  // Remove dead tracklets
   removeTracks();
 
-  // TODO: Add new tracklets
-  for (size_t i = 0; i < centroids_x.size(); ++i) {
-    if (associated_detections[i])
-      continue;
-
-    // Create the new tracklet.
-  }
+  // Add new tracklets
+  addTracks(associated_detections, centroids_x, centroids_y);
 }

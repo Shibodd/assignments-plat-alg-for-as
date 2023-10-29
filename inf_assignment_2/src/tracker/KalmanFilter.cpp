@@ -55,7 +55,7 @@ void KalmanFilter::predict()
   P_ = F_ * P_ * F_.transpose();
 }
 
-void KalmanFilter::update(const Eigen::VectorXd &z)
+void KalmanFilter::update(const Eigen::Vector2d &z)
 {
   Eigen::VectorXd y = z - H_ * x_;
   Eigen::MatrixXd S = H_ * P_ * H_.transpose() + R_;
