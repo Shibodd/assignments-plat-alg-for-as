@@ -19,10 +19,10 @@ public:
   void setState(double x, double y);
 
   // getters
-  double getXCovariance() { return P_.coeff(0, 0); }
-  double getYCovariance() { return P_.coeff(1, 1); }
-  double getX() { return x_[0]; }
-  double getY() { return x_[1]; }
+  inline Eigen::Vector2d getPosition() const { return x_.head(2); }
+  inline Eigen::Matrix2d getPositionCovariance() const { return P_.topLeftCorner(2, 2); }
+  double getXCovariance() { return P_(0, 0); }
+  double getYCovariance() { return P_(1, 1); }
 
 private:
   // dt in seconds
