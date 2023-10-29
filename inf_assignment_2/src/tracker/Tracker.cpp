@@ -1,6 +1,9 @@
 #include "tracker/Tracker.h"
 #include "gauss.hpp"
 #include "rectangular_lsap.hpp"
+#include "logging.hpp"
+
+static const logging::Logger logger("tracker");
 
 Tracker::Tracker()
 {
@@ -54,7 +57,7 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
   int det_count = det_xs.size();
   int track_count = tracks_.size();
 
-  Eigen::MatrixXd ans(track_count, det_count);
+  Eigen::MatrixXd ans(det_count, track_count);
   for (size_t det_idx = 0; det_idx < det_count; ++det_idx) {
     Eigen::Vector2d det(det_xs[det_idx], det_ys[det_idx]);
 
@@ -62,7 +65,10 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
       const Tracklet& track = tracks_[tracklet_idx];
 
       // Use the square of the mahalanobis distance for performance
-      ans(det_idx, tracklet_idx) = gauss::mahalanobis2(det, track.getPosition(), track.getPositionCovariance());
+      auto pos = track.getPosition();
+      auto cov = track.getPositionCovariance();
+      auto mah = gauss::mahalanobis2(det, pos, cov);
+      ans(det_idx, tracklet_idx) = mah;
     }
   }
 

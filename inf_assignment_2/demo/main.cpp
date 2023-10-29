@@ -7,7 +7,7 @@
 #include <inttypes.h>
 #include <chrono>
 
-const logging::Logger logger("main");
+static const logging::Logger logger("main");
 
 int main(int argc, char *argv[])
 {
