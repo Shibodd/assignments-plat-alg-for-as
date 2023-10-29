@@ -34,12 +34,12 @@ private:
   std::vector<Tracklet> tracks_;
   int cur_id_;
 
-  // association
-  std::vector<std::pair<int, int>> associated_track_det_ids_;
-
   // thresholds
   double distance_threshold_;
   double covariance_threshold;
+
+  // Computes the assignment cost matrix for the data association problem.
+  Eigen::MatrixXd assignment_cost_matrix(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const;
 };
 
 #endif // TRACKER_H_

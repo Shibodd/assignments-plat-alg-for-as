@@ -16,8 +16,8 @@ public:
   void update(double x, double y, bool lidarStatus);
 
   // getters
-  double getX() { return kf_.getX(); }
-  double getY() { return kf_.getY(); }
+  inline Eigen::Vector2d getPosition() const { return kf_.getPosition(); }
+  inline Eigen::Matrix2d getPositionCovariance() const { return kf_.getPositionCovariance(); }
   double getXCovariance() { return kf_.getXCovariance(); }
   double getYCovariance() { return kf_.getYCovariance(); }
   int getLossCount() { return loss_count_; }

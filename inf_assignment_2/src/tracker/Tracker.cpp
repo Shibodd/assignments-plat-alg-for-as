@@ -1,4 +1,6 @@
 #include "tracker/Tracker.h"
+#include "gauss.hpp"
+#include "rectangular_lsap.hpp"
 
 Tracker::Tracker()
 {
@@ -42,61 +44,67 @@ void Tracker::addTracks(const std::vector<bool> &associated_detections, const st
       tracks_.push_back(Tracklet(cur_id_++, centroids_x[i], centroids_y[i]));
 }
 
-/*
-    This function associates detections (centroids_x,centroids_y) with the tracks (tracks_)
-    Input:
-        associated_detection an empty vector to host the associated detection
-        centroids_x & centroids_y measurements representing the detected objects
-*/
-void Tracker::dataAssociation(std::vector<bool> &associated_detections, const std::vector<double> &centroids_x, const std::vector<double> &centroids_y)
-{
 
-  // Remind this vector contains a pair of tracks and its corresponding
-  associated_track_det_ids_.clear();
 
-  for (size_t i = 0; i < tracks_.size(); ++i)
-  {
+Eigen::MatrixXd Tracker::assignment_cost_matrix(
+    const std::vector<double> &det_xs,
+    const std::vector<double> &det_ys) const {
 
-    int closest_point_id = -1;
-    double min_dist = std::numeric_limits<double>::max();
+  assert(det_xs.size() == det_ys.size());
+  int det_count = det_xs.size();
+  int track_count = tracks_.size();
 
-    for (size_t j = 0; j < associated_detections.size(); ++j)
-    {
-      // TODO
-      // Implement logic to find the closest detection (centroids_x,centroids_y)
-      // to the current track (tracks_)
-    }
+  Eigen::MatrixXd ans(track_count, det_count);
+  for (size_t det_idx = 0; det_idx < det_count; ++det_idx) {
+    Eigen::Vector2d det(det_xs[det_idx], det_ys[det_idx]);
 
-    // Associate the closest detection to a tracklet
-    if (min_dist < distance_threshold_ && !associated_detections[closest_point_id])
-    {
-      associated_track_det_ids_.push_back(std::make_pair(closest_point_id, i));
-      associated_detections[closest_point_id] = true;
+    for (size_t tracklet_idx = 0; tracklet_idx < track_count; ++tracklet_idx) {
+      const Tracklet& track = tracks_[tracklet_idx];
+
+      // Use the square of the mahalanobis distance for performance
+      ans(det_idx, tracklet_idx) = gauss::mahalanobis2(det, track.getPosition(), track.getPositionCovariance());
     }
   }
+
+  return ans;
 }
+
 
 void Tracker::track(const std::vector<double> &centroids_x,
                     const std::vector<double> &centroids_y,
                     bool lidarStatus)
 {
+  assert(centroids_x.size() == centroids_y.size());
 
+  // Predict each tracker
+  for (auto tracker : tracks_)
+    tracker.predict();
+
+  // Data association
+  Eigen::MatrixXd association_costs = assignment_cost_matrix(centroids_x, centroids_y);
+  std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
   std::vector<bool> associated_detections(centroids_x.size(), false);
 
-  // TODO: Predict the position
-  // For each track --> Predict the position of the tracklets
-
-  // TODO: Associate the predictions with the detections
-
-  // Update tracklets with the new detections
-  for (int i = 0; i < associated_track_det_ids_.size(); ++i)
+  for (auto association : associations)
   {
-    auto det_id = associated_track_det_ids_[i].first;
-    auto track_id = associated_track_det_ids_[i].second;
+    auto det_id = association.first;
+    auto track_id = association.second;
+
+    // Update tracklets with the new detections
     tracks_[track_id].update(centroids_x[det_id], centroids_y[det_id], lidarStatus);
+
+    // Mark this detection as associated (see Add new tracklets)
+    associated_detections[det_id] = true;
   }
 
   // TODO: Remove dead tracklets
+  removeTracks();
 
   // TODO: Add new tracklets
+  for (size_t i = 0; i < centroids_x.size(); ++i) {
+    if (associated_detections[i])
+      continue;
+
+    // Create the new tracklet.
+  }
 }
