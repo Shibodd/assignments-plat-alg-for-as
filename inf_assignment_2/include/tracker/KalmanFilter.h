@@ -13,7 +13,7 @@ public:
   void init(double dt);
 
   void predict();
-  void update(const Eigen::VectorXd& z);
+  void update(const Eigen::Vector2d& z);
 
   // setters
   void setState(double x, double y);
@@ -29,22 +29,22 @@ private:
   double dt_;
 
   // state vector
-  Eigen::VectorXd x_;
+  Eigen::Vector4d x_;
 
   // state covariance matrix
-  Eigen::MatrixXd P_;
+  Eigen::Matrix4d P_;
 
-  // state transistion matrix
-  Eigen::MatrixXd F_;
+  // state transition matrix
+  Eigen::Matrix4d F_;
 
   // process covariance matrix
-  Eigen::MatrixXd Q_;
+  Eigen::Matrix4d Q_;
 
   // measurement matrix
-  Eigen::MatrixXd H_;
+  Eigen::Matrix<double, 2, 4> H_;
 
   // measurement covariance matrix
-  Eigen::MatrixXd R_;
+  Eigen::Matrix2d R_;
 };
 
 #endif // KALMAN_FILTER_H_
