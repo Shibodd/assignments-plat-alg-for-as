@@ -36,6 +36,7 @@ private:
   // Computes the assignment cost matrix for the data association problem.
   Eigen::MatrixXd assignment_cost_matrix(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const;
 
+  // Performs data association and returns the detection association vector
   std::vector<int> dataAssociation(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const;
 };
 

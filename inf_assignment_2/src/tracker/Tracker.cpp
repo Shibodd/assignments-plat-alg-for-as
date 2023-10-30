@@ -88,10 +88,15 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
 std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const {
   assert(det_xs.size() == det_ys.size());
 
+  // Compute the cost matrix for the Linear Sum Assignment Problem
   Eigen::MatrixXd association_costs = assignment_cost_matrix(det_xs, det_ys);
+
+  // Solve the LSAP
   std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
 
-  std::vector<int> ans_associations(det_xs.size(), -1);
+  // Build the association vector
+  // (for each detection, the track idx that it is associated to, or -1 if it is not associated)
+  std::vector<int> association_vector(det_xs.size(), -1);
   for (auto association : associations) {
     int det_idx = association.first;
     int track_idx = association.second;
@@ -101,10 +106,10 @@ std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, con
     if (association_costs(det_idx, track_idx) >= HUGE)
       continue; 
 
-    ans_associations[det_idx] = track_idx;
+    association_vector[det_idx] = track_idx;
   }
 
-  return ans_associations;
+  return association_vector;
 }
 
 
