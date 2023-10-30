@@ -6,13 +6,11 @@
 
 static const logging::Logger logger("tracker");
 
-// Don't use a really huge number or LSAP becomes unstable
-static const double HUGE = 10e5;
 
 Tracker::Tracker()
 {
   cur_id_ = 0;
-  distance_threshold_2_ = 0.5; // meters^2
+  distance_threshold_ = 2; // meters
   lost_count_threshold_ = 50;
 }
 
@@ -120,8 +118,13 @@ std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, con
   for (auto association : associations) {
     int det_idx = association.first;
     int track_idx = association.second;
+
+    auto track_pos = tracks_[track_idx].getPosition();
+    auto det_pos = Eigen::Vector2d(det_xs[det_idx], det_ys[det_idx]);
+
+    auto dist = (track_pos - det_pos).norm();
     
-    if (association_costs(det_idx, track_idx) > distance_threshold_2_)
+    if (dist > distance_threshold_)
       continue;
 
     association_vector[det_idx] = track_idx;

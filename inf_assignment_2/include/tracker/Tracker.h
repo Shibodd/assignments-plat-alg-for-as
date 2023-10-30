@@ -32,7 +32,7 @@ private:
   int cur_id_;
 
   // thresholds
-  double distance_threshold_2_;
+  double distance_threshold_;
   int lost_count_threshold_;
 
   // Computes the assignment cost matrix for the data association problem.
