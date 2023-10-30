@@ -12,29 +12,34 @@ void KalmanFilter::init(double dt)
 {
   dt_ = dt;
 
-  x_ << 0, 0, 0, 0;
+  // create a 4D state vector
+  x_ = Eigen::VectorXd(4);
 
-  // state covariance matrix P
+  // TODO: Initialize the state covariance matrix P
+  P_ = Eigen::MatrixXd(4, 4);
   P_ << 9999., 0., 0., 0.,
       0., 9999., 0., 0.,
       0., 0., 9999., 0.,
       0., 0., 0., 9999.;
 
   // measurement covariance
+  R_ = Eigen::MatrixXd(2, 2);
   R_ << 0.0225, 0.,
       0., 0.0225;
 
   // measurement matrix
+  H_ = Eigen::MatrixXd(2, 4);
   H_ << 1., 0., 0., 0.,
       0., 1., 0., 0.;
 
   // the transition matrix F
+  F_ = Eigen::MatrixXd(4, 4);
   F_ << 1., 0., dt_, 0.,
       0., 1., 0., dt_,
       0., 0., 1., 0.,
       0., 0., 0., 1.;
 
-  // the acceleration noise components
+  // set the acceleration noise components
   double noise_ax_ = 2.;
   double noise_ay_ = 2.;
 
@@ -42,7 +47,8 @@ void KalmanFilter::init(double dt)
   double dt_3 = dt_2 * dt_;
   double dt_4 = dt_3 * dt_;
 
-  // the process covariance matrix Q
+  // set the process covariance matrix Q
+  Q_ = Eigen::MatrixXd(4, 4);
   Q_ << dt_4 / 4. * noise_ax_, 0., dt_3 / 2. * noise_ax_, 0.,
       0., dt_4 / 4. * noise_ay_, 0., dt_3 / 2. * noise_ay_,
       dt_3 / 2. * noise_ax_, 0., dt_2 * noise_ax_, 0.,
@@ -52,10 +58,10 @@ void KalmanFilter::init(double dt)
 void KalmanFilter::predict()
 {
   x_ = F_ * x_;
-  P_ = F_ * P_ * F_.transpose();
+  P_ = F_ * P_ * F_.transpose() + Q_;
 }
 
-void KalmanFilter::update(const Eigen::Vector2d &z)
+void KalmanFilter::update(const Eigen::VectorXd &z)
 {
   Eigen::VectorXd y = z - H_ * x_;
   Eigen::MatrixXd S = H_ * P_ * H_.transpose() + R_;
