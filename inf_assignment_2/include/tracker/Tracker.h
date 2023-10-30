@@ -12,7 +12,7 @@ public:
 
   // handle tracklets
   void removeTracks();
-  void addTracks(const std::vector<int> &det_associated_tracks,
+  void addTracks(const std::vector<int> &det_association_vector,
                  const std::vector<double> &centroids_x,
                  const std::vector<double> &centroids_y);
 

@@ -42,13 +42,13 @@ void Tracker::removeTracks()
 /*
     This function add new tracks to the set of tracks ("tracks_" is the object that contains this)
 */
-void Tracker::addTracks(const std::vector<int> &det_associated_tracks, const std::vector<double> &centroids_x, const std::vector<double> &centroids_y)
+void Tracker::addTracks(const std::vector<int> &det_association_vector, const std::vector<double> &centroids_x, const std::vector<double> &centroids_y)
 {
-  assert(det_associated_tracks.size() == centroids_x.size() && centroids_x.size() == centroids_y.size());
+  assert(det_association_vector.size() == centroids_x.size() && centroids_x.size() == centroids_y.size());
 
   // Adding not associated detections
-  for (size_t det_idx = 0; det_idx < det_associated_tracks.size(); ++det_idx)
-    if (det_associated_tracks[det_idx] < 0)
+  for (size_t det_idx = 0; det_idx < det_association_vector.size(); ++det_idx)
+    if (det_association_vector[det_idx] < 0)
       tracks_.push_back(Tracklet(cur_id_++, centroids_x[det_idx], centroids_y[det_idx]));
 }
 
@@ -124,12 +124,12 @@ void Tracker::track(const std::vector<double> &centroids_x,
     tracker.predict();
 
   // Data association
-  auto det_associated_tracks = dataAssociation(centroids_x, centroids_y);  
+  auto det_association_vector = dataAssociation(centroids_x, centroids_y);  
 
-  for (int det_idx = 0; det_idx < det_associated_tracks.size(); ++det_idx)
+  for (int det_idx = 0; det_idx < det_association_vector.size(); ++det_idx)
   {
     // For each associated detection
-    auto track_idx = det_associated_tracks[det_idx];
+    auto track_idx = det_association_vector[det_idx];
     if (track_idx < 0)
       continue;
 
@@ -141,5 +141,5 @@ void Tracker::track(const std::vector<double> &centroids_x,
   removeTracks();
 
   // Add new tracklets
-  addTracks(det_associated_tracks, centroids_x, centroids_y);
+  addTracks(det_association_vector, centroids_x, centroids_y);
 }
