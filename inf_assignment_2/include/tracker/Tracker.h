@@ -2,6 +2,7 @@
 #define TRACKER_H_
 
 #include "tracker/Tracklet.h"
+#include "viewer/Renderer.h"
 #include <limits>
 
 class Tracker
@@ -21,7 +22,7 @@ public:
   // Entry point
   void track(const std::vector<double> &centroids_x,
              const std::vector<double> &centroids_y,
-             bool lidarStatus);
+             viewer::Renderer& renderer);
 
   const std::vector<Tracklet> &getTracks() { return tracks_; }
 

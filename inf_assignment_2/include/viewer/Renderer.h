@@ -43,7 +43,7 @@ namespace viewer
 
     void clearViewer();
 
-    void addText(float centroid_x, float centroid_y, int id);
+    void addText(float centroid_x, float centroid_y, const std::string& text, const std::string& id = "", double r = 1, double g = 1, double b = 1);
 
     void renderPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
                           const std::string &name,

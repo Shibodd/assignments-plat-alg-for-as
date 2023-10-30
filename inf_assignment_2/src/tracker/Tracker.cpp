@@ -12,8 +12,8 @@ static const double HUGE = 10e5;
 Tracker::Tracker()
 {
   cur_id_ = 0;
-  distance_threshold_2_ = 2; // meters^2
-  lost_count_threshold_ = 2;
+  distance_threshold_2_ = 0.5; // meters^2
+  lost_count_threshold_ = 1;
 }
 
 
@@ -96,16 +96,9 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
 
       auto pos = track.getPosition();
       auto cov = track.getPositionCovariance();
+      double dist = (pos - det).norm();
 
-      // We don't need to compute the square root as it doesn't change the ordering
-      double mah = gauss::mahalanobis2(det, pos, cov);
-
-      // If the distance is too large, set a huge cost to discourage the association
-      if ((pos - det).squaredNorm() > distance_threshold_2_) {
-        mah = HUGE;
-      }
-      
-      ans(det_idx, tracklet_idx) = mah;
+      ans(det_idx, tracklet_idx) = dist;
     }
   }
 
@@ -128,11 +121,8 @@ std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, con
     int det_idx = association.first;
     int track_idx = association.second;
 
-    // See assignment_cost_matrix
-    // Penalizing an association doesn't mean it will never be picked (e.g. tracker count >= detection count)
-    if (association_costs(det_idx, track_idx) >= HUGE) {
-      continue; 
-    }
+    if (association_costs(det_idx, track_idx) > distance_threshold_2_)
+      continue;
 
     association_vector[det_idx] = track_idx;
   }
@@ -143,9 +133,11 @@ std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, con
 
 void Tracker::track(const std::vector<double> &centroids_x,
                     const std::vector<double> &centroids_y,
-                    bool lidarStatus)
+                    viewer::Renderer& renderer)
 {
   assert(centroids_x.size() == centroids_y.size());
+
+  bool lidarStatus = renderer.getLidarStatus();
 
   // Predict each tracker
   for (auto tracker : tracks_)
@@ -162,6 +154,7 @@ void Tracker::track(const std::vector<double> &centroids_x,
       continue;
 
     tracks_[track_idx].update(centroids_x[det_idx], centroids_y[det_idx], lidarStatus);
+    renderer.addText(centroids_x[det_idx], centroids_y[det_idx], std::to_string(tracks_[track_idx].getId()), "track_idx", 0, 1, 0);
   }
 
   // Remove dead tracklet

@@ -25,10 +25,10 @@ namespace viewer
     viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 10000.0, "c_" + std::to_string(id));
   }
 
-  void Renderer::addText(float centroid_x, float centroid_y, int id)
+  void Renderer::addText(float centroid_x, float centroid_y, const std::string& text, const std::string& id, double r, double g, double b)
   {
 
-    viewer_->addText3D(std::to_string(id), pcl::PointXYZ(centroid_x, centroid_y, 0), 0.3, 255, 255, 255, "", 0);
+    viewer_->addText3D(text, pcl::PointXYZ(centroid_x, centroid_y, 0), 0.3, r, g, b, text + id, 0);
   }
 
   void Renderer::removeShape(int id)

@@ -64,7 +64,7 @@ std::vector<int> argsort_iter(const std::vector<T> &v)
 }
 
 static int
-augmenting_path(int nc, const double *cost, std::vector<double> &u,
+augmenting_path(int nc, const Eigen::MatrixXd& costs, std::vector<double> &u,
                 std::vector<double> &v, std::vector<int> &path,
                 std::vector<int> &row4col,
                 std::vector<double> &shortestPathCosts, int i,
@@ -100,7 +100,7 @@ augmenting_path(int nc, const double *cost, std::vector<double> &u,
     {
       int j = remaining[it];
 
-      double r = minVal + cost[i * nc + j] - u[i] - v[j];
+      double r = minVal + costs(i, j) - u[i] - v[j];
       if (r < shortestPathCosts[j])
       {
         path[j] = i;
@@ -147,62 +147,32 @@ std::vector<std::pair<int, int>> lsap::solve(Eigen::MatrixXd costs, bool maximiz
 {
   std::vector<std::pair<int, int>> assignments;
 
-  int nr = costs.rows();
-  int nc = costs.cols();
-  double* cost = costs.data();
-
   // handle trivial inputs
-  if (nr == 0 || nc == 0)
+  if (costs.rows() == 0 || costs.cols() == 0)
   {
     return assignments;
   }
 
   // tall rectangular cost matrix must be transposed
-  bool transpose = nc < nr;
+  bool transpose = costs.cols() < costs.rows();
 
-  // make a copy of the cost matrix if we need to modify it
-  std::vector<double> temp;
-  if (transpose || maximize)
-  {
-    temp.resize(nr * nc);
+  if (transpose)
+    costs.transposeInPlace();
+    
+  if (maximize)
+    costs = (-costs).eval();
 
-    if (transpose)
-    {
-      for (int i = 0; i < nr; i++)
-      {
-        for (int j = 0; j < nc; j++)
-        {
-          temp[j * nr + i] = cost[i * nc + j];
-        }
-      }
-
-      std::swap(nr, nc);
-    }
-    else
-    {
-      std::copy(cost, cost + nr * nc, temp.begin());
-    }
-
-    // negate cost matrix for maximization
-    if (maximize)
-    {
-      for (int i = 0; i < nr * nc; i++)
-      {
-        temp[i] = -temp[i];
-      }
-    }
-
-    cost = temp.data();
-  }
+  int nr = costs.rows();
+  int nc = costs.cols();
 
   // test for NaN and -inf entries
-  for (int i = 0; i < nr * nc; i++)
-  {
-    if (cost[i] != cost[i] || cost[i] == -INFINITY)
-    {
-      throw lsap::SolverException(lsap::RECTANGULAR_LSAP_INVALID);
+  for (int i = 0; i < nr; ++i) {
+    for (int j = 0; j < nc; ++j) {
+      if (costs(i, j) != costs(i, j) || costs(i, j) == -INFINITY)  
+        throw lsap::SolverException(lsap::RECTANGULAR_LSAP_INVALID);
     }
   }
+
 
   // initialize variables
   std::vector<double> u(nr, 0);
@@ -220,7 +190,7 @@ std::vector<std::pair<int, int>> lsap::solve(Eigen::MatrixXd costs, bool maximiz
   {
 
     double minVal;
-    int sink = augmenting_path(nc, cost, u, v, path, row4col,
+    int sink = augmenting_path(nc, costs, u, v, path, row4col,
                                     shortestPathCosts, curRow, SR, SC,
                                     remaining, &minVal);
     if (sink < 0)

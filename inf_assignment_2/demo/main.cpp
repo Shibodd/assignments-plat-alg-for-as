@@ -61,14 +61,14 @@ int main(int argc, char *argv[])
             renderer.renderBox(boxes[i], i);
 
         // Call the tracker on the detected clusters
-        tracker.track(centroids_x, centroids_y, renderer.getLidarStatus());
+        tracker.track(centroids_x, centroids_y, renderer);
 
         // retrieve tracklets and render the trackers
         auto tracks = tracker.getTracks();
         for (size_t i = 0; i < tracks.size(); ++i)
         {
             renderer.addCircle(tracks[i].getX(), tracks[i].getY(), tracks[i].getId());
-            renderer.addText(tracks[i].getX() + 0.01, tracks[i].getY() + 0.01, tracks[i].getId());
+            renderer.addText(tracks[i].getX() + 0.01, tracks[i].getY() + 0.01, std::to_string(tracks[i].getId()));
         }
 
         renderer.spinViewerOnce();
