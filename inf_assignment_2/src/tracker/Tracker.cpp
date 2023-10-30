@@ -140,7 +140,7 @@ void Tracker::track(const std::vector<double> &centroids_x,
   bool lidarStatus = renderer.getLidarStatus();
 
   // Predict each tracker
-  for (auto tracker : tracks_)
+  for (auto& tracker : tracks_)
     tracker.predict();
 
   // Data association
