@@ -10,18 +10,19 @@ public:
   Tracker();
   ~Tracker();
 
-  // handle tracklets
-  void removeTracks();
+  // Dead tracklets removal logic
+  void removeTracks(const std::vector<int> &det_association_vector);
+
+  // New tracklets addition logic
   void addTracks(const std::vector<int> &det_association_vector,
                  const std::vector<double> &centroids_x,
                  const std::vector<double> &centroids_y);
 
-  // track objects
+  // Entry point
   void track(const std::vector<double> &centroids_x,
              const std::vector<double> &centroids_y,
              bool lidarStatus);
 
-  // getters
   const std::vector<Tracklet> &getTracks() { return tracks_; }
 
 private:
@@ -31,7 +32,7 @@ private:
 
   // thresholds
   double distance_threshold_2_;
-  double covariance_threshold;
+  int lost_count_threshold_;
 
   // Computes the assignment cost matrix for the data association problem.
   Eigen::MatrixXd assignment_cost_matrix(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const;

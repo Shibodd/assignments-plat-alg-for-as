@@ -12,41 +12,52 @@ Tracker::Tracker()
 {
   cur_id_ = 0;
   distance_threshold_2_ = 0.0; // meters
-  covariance_threshold = 0.0;
+  lost_count_threshold_ = 2;
 }
+
 
 Tracker::~Tracker()
 {
 }
 
-/*
-    This function removes tracks based on any strategy
-*/
-void Tracker::removeTracks()
+
+void Tracker::removeTracks(const std::vector<int> &det_association_vector)
 {
+  // Create a map to check if a track is associated
+  std::vector<bool> associated_tracks(tracks_.size());
+  for (auto track_idx : det_association_vector) {
+    if (track_idx >= 0) {
+      associated_tracks[track_idx] = true;
+
+      // This track is associated, so reset its lost count
+      tracks_[track_idx].resetLostCount();
+    }
+  }
+
+  // For each track that is not associated, increase the lost_count.
+  for (int track_idx = 0; track_idx < tracks_.size(); ++track_idx) {
+    if (!associated_tracks[track_idx]) {
+      tracks_[track_idx].increaseLostCount();
+    }
+  }
+
+  // Keep any track for which lost_count <= lost_count_threshold
   std::vector<Tracklet> tracks_to_keep;
 
-  for (size_t i = 0; i < tracks_.size(); ++i)
-  {
-    // TODO
-    // Implement logic to discard old tracklets
-    // logic_to_keep is a dummy placeholder to make the code compile and should be subsituted with the real condition
-    bool logic_to_keep = true;
-    if (logic_to_keep)
-      tracks_to_keep.push_back(tracks_[i]);
-  }
+  int lct = lost_count_threshold_;
+  std::copy_if(tracks_.begin(), tracks_.end(), tracks_to_keep.begin(), [lct](Tracklet track) {
+    return track.getLostCount() <= lct;
+  });
 
   tracks_.swap(tracks_to_keep);
 }
 
-/*
-    This function add new tracks to the set of tracks ("tracks_" is the object that contains this)
-*/
+
 void Tracker::addTracks(const std::vector<int> &det_association_vector, const std::vector<double> &centroids_x, const std::vector<double> &centroids_y)
 {
   assert(det_association_vector.size() == centroids_x.size() && centroids_x.size() == centroids_y.size());
 
-  // Adding not associated detections
+  // For each non-associated detection, add a new tracklet
   for (size_t det_idx = 0; det_idx < det_association_vector.size(); ++det_idx)
     if (det_association_vector[det_idx] < 0)
       tracks_.push_back(Tracklet(cur_id_++, centroids_x[det_idx], centroids_y[det_idx]));
@@ -63,18 +74,21 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
   int track_count = tracks_.size();
 
   Eigen::MatrixXd ans(det_count, track_count);
+
+  // Compute each element of the cost matrix
   for (size_t det_idx = 0; det_idx < det_count; ++det_idx) {
     Eigen::Vector2d det(det_xs[det_idx], det_ys[det_idx]);
 
     for (size_t tracklet_idx = 0; tracklet_idx < track_count; ++tracklet_idx) {
       const Tracklet& track = tracks_[tracklet_idx];
 
-      // Use the square of the mahalanobis distance for performance
       auto pos = track.getPosition();
       auto cov = track.getPositionCovariance();
+
+      // We don't need to compute the square root as it doesn't change the ordering
       double mah = gauss::mahalanobis2(det, pos, cov);
 
-      // If the distance is too large, set a huge distance to penalize the association
+      // If the distance is too large, set a huge cost to discourage the association
       if ((pos - det).squaredNorm() > distance_threshold_2_)
         mah = HUGE;
       
@@ -124,21 +138,20 @@ void Tracker::track(const std::vector<double> &centroids_x,
     tracker.predict();
 
   // Data association
-  auto det_association_vector = dataAssociation(centroids_x, centroids_y);  
+  auto det_association_vector = dataAssociation(centroids_x, centroids_y);
 
+  // Update the associated track for each associated detection
   for (int det_idx = 0; det_idx < det_association_vector.size(); ++det_idx)
   {
-    // For each associated detection
     auto track_idx = det_association_vector[det_idx];
     if (track_idx < 0)
       continue;
 
-    // Update the associated track using the new detection
     tracks_[track_idx].update(centroids_x[det_idx], centroids_y[det_idx], lidarStatus);
   }
 
   // Remove dead tracklets
-  removeTracks();
+  removeTracks(det_association_vector);
 
   // Add new tracklets
   addTracks(det_association_vector, centroids_x, centroids_y);
