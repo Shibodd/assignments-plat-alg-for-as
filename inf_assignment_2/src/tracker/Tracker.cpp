@@ -6,12 +6,13 @@
 
 static const logging::Logger logger("tracker");
 
-static const double HUGE = std::numeric_limits<double>::max();
+// Don't use a really huge number or LSAP becomes unstable
+static const double HUGE = 10e5;
 
 Tracker::Tracker()
 {
   cur_id_ = 0;
-  distance_threshold_2_ = 0.0; // meters
+  distance_threshold_2_ = 2; // meters^2
   lost_count_threshold_ = 2;
 }
 
@@ -23,21 +24,25 @@ Tracker::~Tracker()
 
 void Tracker::removeTracks(const std::vector<int> &det_association_vector)
 {
-  // Create a map to check if a track is associated
+  // Create a map to check if a track is 
   std::vector<bool> associated_tracks(tracks_.size());
   for (auto track_idx : det_association_vector) {
     if (track_idx >= 0) {
       associated_tracks[track_idx] = true;
-
-      // This track is associated, so reset its lost count
-      tracks_[track_idx].resetLostCount();
     }
   }
 
-  // For each track that is not associated, increase the lost_count.
+  // For each track that is associated, reset the lost count.
+  // For each track that is not associated, increase the lost count.
   for (int track_idx = 0; track_idx < tracks_.size(); ++track_idx) {
-    if (!associated_tracks[track_idx]) {
-      tracks_[track_idx].increaseLostCount();
+    auto& track = tracks_[track_idx];
+    
+    if (associated_tracks[track_idx]) {
+      track.resetLostCount();
+      logger.debug("Track %d is alive", track.getId());
+    } else {
+      track.increaseLostCount();
+      logger.debug("Unassociated track %d - lost count %d", track.getId(), track.getLostCount());
     }
   }
 
@@ -45,8 +50,11 @@ void Tracker::removeTracks(const std::vector<int> &det_association_vector)
   std::vector<Tracklet> tracks_to_keep;
 
   int lct = lost_count_threshold_;
-  std::copy_if(tracks_.begin(), tracks_.end(), tracks_to_keep.begin(), [lct](Tracklet track) {
-    return track.getLostCount() <= lct;
+  std::copy_if(tracks_.begin(), tracks_.end(), std::back_inserter(tracks_to_keep), [lct](Tracklet track) {
+    bool keep = track.getLostCount() <= lct;
+    if (!keep)
+      logger.debug("Dropping track %d! - Lost count %d", track.getId(), track.getLostCount());
+    return keep;
   });
 
   tracks_.swap(tracks_to_keep);
@@ -58,9 +66,13 @@ void Tracker::addTracks(const std::vector<int> &det_association_vector, const st
   assert(det_association_vector.size() == centroids_x.size() && centroids_x.size() == centroids_y.size());
 
   // For each non-associated detection, add a new tracklet
-  for (size_t det_idx = 0; det_idx < det_association_vector.size(); ++det_idx)
-    if (det_association_vector[det_idx] < 0)
-      tracks_.push_back(Tracklet(cur_id_++, centroids_x[det_idx], centroids_y[det_idx]));
+  for (size_t det_idx = 0; det_idx < det_association_vector.size(); ++det_idx) {
+    if (det_association_vector[det_idx] < 0) {
+      logger.debug("New track %d!", cur_id_);
+      tracks_.push_back(Tracklet(cur_id_, centroids_x[det_idx], centroids_y[det_idx]));
+      ++cur_id_;
+    }
+  }
 }
 
 
@@ -89,8 +101,9 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
       double mah = gauss::mahalanobis2(det, pos, cov);
 
       // If the distance is too large, set a huge cost to discourage the association
-      if ((pos - det).squaredNorm() > distance_threshold_2_)
+      if ((pos - det).squaredNorm() > distance_threshold_2_) {
         mah = HUGE;
+      }
       
       ans(det_idx, tracklet_idx) = mah;
     }
@@ -116,9 +129,10 @@ std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, con
     int track_idx = association.second;
 
     // See assignment_cost_matrix
-    // Penalizing an association doesn't mean it will never be picked
-    if (association_costs(det_idx, track_idx) >= HUGE)
+    // Penalizing an association doesn't mean it will never be picked (e.g. tracker count >= detection count)
+    if (association_costs(det_idx, track_idx) >= HUGE) {
       continue; 
+    }
 
     association_vector[det_idx] = track_idx;
   }
@@ -150,7 +164,7 @@ void Tracker::track(const std::vector<double> &centroids_x,
     tracks_[track_idx].update(centroids_x[det_idx], centroids_y[det_idx], lidarStatus);
   }
 
-  // Remove dead tracklets
+  // Remove dead tracklet
   removeTracks(det_association_vector);
 
   // Add new tracklets

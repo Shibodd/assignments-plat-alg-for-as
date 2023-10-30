@@ -1,10 +1,9 @@
 #include "tracker/Tracklet.h"
 
 Tracklet::Tracklet(int idTrack, double x, double y)
+  : lost_count_(0),
+    id_(idTrack)
 {
-  // set id
-  id_ = idTrack;
-
   // initialize filter
   kf_.init(0.1);
   kf_.setState(x, y);
