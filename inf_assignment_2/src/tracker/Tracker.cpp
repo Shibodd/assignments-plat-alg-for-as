@@ -13,7 +13,7 @@ Tracker::Tracker()
 {
   cur_id_ = 0;
   distance_threshold_2_ = 0.5; // meters^2
-  lost_count_threshold_ = 1;
+  lost_count_threshold_ = 50;
 }
 
 
@@ -96,9 +96,9 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
 
       auto pos = track.getPosition();
       auto cov = track.getPositionCovariance();
-      double dist = (pos - det).norm();
+      double dist = gauss::multivariate_gauss_pdf(det, pos, cov);
 
-      ans(det_idx, tracklet_idx) = dist;
+      ans(det_idx, tracklet_idx) = -dist;
     }
   }
 
@@ -120,7 +120,7 @@ std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, con
   for (auto association : associations) {
     int det_idx = association.first;
     int track_idx = association.second;
-
+    
     if (association_costs(det_idx, track_idx) > distance_threshold_2_)
       continue;
 
