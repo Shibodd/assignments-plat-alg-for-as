@@ -2,13 +2,16 @@
 #include "gauss.hpp"
 #include "rectangular_lsap.hpp"
 #include "logging.hpp"
+#include <limits>
 
 static const logging::Logger logger("tracker");
+
+static const double HUGE = std::numeric_limits<double>::max();
 
 Tracker::Tracker()
 {
   cur_id_ = 0;
-  distance_threshold_ = 0.0; // meters
+  distance_threshold_2_ = 0.0; // meters
   covariance_threshold = 0.0;
 }
 
@@ -39,12 +42,14 @@ void Tracker::removeTracks()
 /*
     This function add new tracks to the set of tracks ("tracks_" is the object that contains this)
 */
-void Tracker::addTracks(const std::vector<bool> &associated_detections, const std::vector<double> &centroids_x, const std::vector<double> &centroids_y)
+void Tracker::addTracks(const std::vector<int> &det_associated_tracks, const std::vector<double> &centroids_x, const std::vector<double> &centroids_y)
 {
+  assert(det_associated_tracks.size() == centroids_x.size() && centroids_x.size() == centroids_y.size());
+
   // Adding not associated detections
-  for (size_t i = 0; i < associated_detections.size(); ++i)
-    if (!associated_detections[i])
-      tracks_.push_back(Tracklet(cur_id_++, centroids_x[i], centroids_y[i]));
+  for (size_t det_idx = 0; det_idx < det_associated_tracks.size(); ++det_idx)
+    if (det_associated_tracks[det_idx] < 0)
+      tracks_.push_back(Tracklet(cur_id_++, centroids_x[det_idx], centroids_y[det_idx]));
 }
 
 
@@ -67,12 +72,39 @@ Eigen::MatrixXd Tracker::assignment_cost_matrix(
       // Use the square of the mahalanobis distance for performance
       auto pos = track.getPosition();
       auto cov = track.getPositionCovariance();
-      auto mah = gauss::mahalanobis2(det, pos, cov);
+      double mah = gauss::mahalanobis2(det, pos, cov);
+
+      // If the distance is too large, set a huge distance to penalize the association
+      if ((pos - det).squaredNorm() > distance_threshold_2_)
+        mah = HUGE;
+      
       ans(det_idx, tracklet_idx) = mah;
     }
   }
 
   return ans;
+}
+
+std::vector<int> Tracker::dataAssociation(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const {
+  assert(det_xs.size() == det_ys.size());
+
+  Eigen::MatrixXd association_costs = assignment_cost_matrix(det_xs, det_ys);
+  std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
+
+  std::vector<int> ans_associations(det_xs.size(), -1);
+  for (auto association : associations) {
+    int det_idx = association.first;
+    int track_idx = association.second;
+
+    // See assignment_cost_matrix
+    // Penalizing an association doesn't mean it will never be picked
+    if (association_costs(det_idx, track_idx) >= HUGE)
+      continue; 
+
+    ans_associations[det_idx] = track_idx;
+  }
+
+  return ans_associations;
 }
 
 
@@ -87,25 +119,22 @@ void Tracker::track(const std::vector<double> &centroids_x,
     tracker.predict();
 
   // Data association
-  Eigen::MatrixXd association_costs = assignment_cost_matrix(centroids_x, centroids_y);
-  std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
-  std::vector<bool> associated_detections(centroids_x.size(), false);
+  auto det_associated_tracks = dataAssociation(centroids_x, centroids_y);  
 
-  for (auto association : associations)
+  for (int det_idx = 0; det_idx < det_associated_tracks.size(); ++det_idx)
   {
-    auto det_id = association.first;
-    auto track_id = association.second;
+    // For each associated detection
+    auto track_idx = det_associated_tracks[det_idx];
+    if (track_idx < 0)
+      continue;
 
-    // Update tracklets with the new detections
-    tracks_[track_id].update(centroids_x[det_id], centroids_y[det_id], lidarStatus);
-
-    // Mark this detection as associated (see Add new tracklets)
-    associated_detections[det_id] = true;
+    // Update the associated track using the new detection
+    tracks_[track_idx].update(centroids_x[det_idx], centroids_y[det_idx], lidarStatus);
   }
 
   // Remove dead tracklets
   removeTracks();
 
   // Add new tracklets
-  addTracks(associated_detections, centroids_x, centroids_y);
+  addTracks(det_associated_tracks, centroids_x, centroids_y);
 }

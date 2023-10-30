@@ -12,14 +12,9 @@ public:
 
   // handle tracklets
   void removeTracks();
-  void addTracks(const std::vector<bool> &associated_detections,
+  void addTracks(const std::vector<int> &det_associated_tracks,
                  const std::vector<double> &centroids_x,
                  const std::vector<double> &centroids_y);
-
-  // associate tracklets and detections
-  void dataAssociation(std::vector<bool> &associated_detections,
-                       const std::vector<double> &centroids_x,
-                       const std::vector<double> &centroids_y);
 
   // track objects
   void track(const std::vector<double> &centroids_x,
@@ -35,11 +30,13 @@ private:
   int cur_id_;
 
   // thresholds
-  double distance_threshold_;
+  double distance_threshold_2_;
   double covariance_threshold;
 
   // Computes the assignment cost matrix for the data association problem.
   Eigen::MatrixXd assignment_cost_matrix(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const;
+
+  std::vector<int> dataAssociation(const std::vector<double> &det_xs, const std::vector<double> &det_ys) const;
 };
 
 #endif // TRACKER_H_
