@@ -24,7 +24,7 @@ public:
   inline double getYCovariance() const { return kf_.getYCovariance(); }
   inline int getId() const { return id_; }
   inline int getLostCount() const { return lost_count_; }
-  inline int increaseLostCount() { lost_count_++; }
+  inline void increaseLostCount() { lost_count_++; }
   inline void resetLostCount() { lost_count_ = 0; }
 
 private:
