@@ -3,7 +3,7 @@
 
 #include "KalmanFilter.h"
 
-using HistoryListener = void(*)(Eigen::Vector2d);
+using HistoryListener = void(*)(Tracklet&);
 
 class Tracklet
 {
@@ -29,6 +29,7 @@ public:
   inline void increaseLostCount() { lost_count_++; }
   inline void resetLostCount() { lost_count_ = 0; }
   inline void setHistoryListener(HistoryListener f) { history_listener_ = f; }
+  inline Eigen::Vector2d getLastPosition() { return history_last_position_; }
 
 private:
   int history_length_;

@@ -25,7 +25,7 @@ void Tracklet::record()
 {
   auto rec = [this](Eigen::Vector2d pt) {
     if (this->history_listener_)
-      this->history_listener_(pt);
+      this->history_listener_(this);
     this->history_last_position_ = pt;
     ++this->history_length_;
   };

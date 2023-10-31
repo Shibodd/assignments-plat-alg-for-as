@@ -5,6 +5,8 @@
 #include "viewer/Renderer.h"
 #include <limits>
 
+using TracksUpdateListener = void(*)(Tracklet& tracklet, bool added);
+
 class Tracker
 {
 public:
@@ -24,9 +26,12 @@ public:
              const std::vector<double> &centroids_y,
              viewer::Renderer& renderer);
 
+  inline void setTracksUpdateListener(TracksUpdateListener listener) { tracksUpdateListener_ = listener; }
+
   const std::vector<Tracklet> &getTracks() { return tracks_; }
 
 private:
+  TracksUpdateListener tracksUpdateListener_;
   // tracklets
   std::vector<Tracklet> tracks_;
   int cur_id_;

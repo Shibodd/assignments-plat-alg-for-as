@@ -47,11 +47,14 @@ void Tracker::removeTracks(const std::vector<int> &det_association_vector)
   // Keep any track for which lost_count <= lost_count_threshold
   std::vector<Tracklet> tracks_to_keep;
 
-  int lct = lost_count_threshold_;
-  std::copy_if(tracks_.begin(), tracks_.end(), std::back_inserter(tracks_to_keep), [lct](Tracklet track) {
-    bool keep = track.getLostCount() <= lct;
-    if (!keep)
+
+  std::copy_if(tracks_.begin(), tracks_.end(), std::back_inserter(tracks_to_keep), [this](Tracklet track) {
+    bool keep = track.getLostCount() <= lost_count_threshold_;
+    if (!keep) {
+      if (tracksUpdateListener_)
+        tracksUpdateListener_(track, false);
       logger.debug("Dropping track %d! - Lost count %d", track.getId(), track.getLostCount());
+    }
     return keep;
   });
 
@@ -68,6 +71,8 @@ void Tracker::addTracks(const std::vector<int> &det_association_vector, const st
     if (det_association_vector[det_idx] < 0) {
       logger.debug("New track %d!", cur_id_);
       tracks_.push_back(Tracklet(cur_id_, centroids_x[det_idx], centroids_y[det_idx]));
+      if (tracksUpdateListener_)
+        tracksUpdateListener_(tracks_.back(), true);
       ++cur_id_;
     }
   }
