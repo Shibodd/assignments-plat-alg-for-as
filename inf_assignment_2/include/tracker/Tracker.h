@@ -4,8 +4,9 @@
 #include "tracker/Tracklet.h"
 #include "viewer/Renderer.h"
 #include <limits>
+#include <functional>
 
-using TracksUpdateListener = void(*)(Tracklet& tracklet, bool added);
+using TracksUpdateListener = std::function<void(Tracklet&, bool)>;
 
 class Tracker
 {

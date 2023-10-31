@@ -5,6 +5,7 @@
 //
 
 #include "viewer/Renderer.h"
+#include <vtkRenderWindow.h>
 
 namespace viewer
 {
@@ -59,6 +60,19 @@ namespace viewer
     while (rays_counter_-- > 0)
     {
       viewer_->removeShape("ray" + std::to_string(rays_counter_));
+    }
+  }
+
+
+  void Renderer::addActor(vtkActor* actor) {
+    // Add the actor to all renderers (i'm copying from PCL visualizer source code)
+    auto rens = viewer_->getRendererCollection();
+    rens->InitTraversal();
+
+    vtkRenderer* renderer;
+    while ((renderer = rens->GetNextItem())) {
+      renderer->AddActor(actor);
+      addedActors_.push_back(actor);
     }
   }
 
@@ -198,6 +212,15 @@ namespace viewer
   {
     viewer_->removeAllPointClouds();
     viewer_->removeAllShapes();
+
+    auto rens = viewer_->getRendererCollection();
+    rens->InitTraversal();
+
+    vtkRenderer* renderer;
+    while ((renderer = rens->GetNextItem())) {
+      for (auto actor : addedActors_)
+        renderer->RemoveActor(actor);
+    }
   }
 
   bool Renderer::wasViewerStopped() const

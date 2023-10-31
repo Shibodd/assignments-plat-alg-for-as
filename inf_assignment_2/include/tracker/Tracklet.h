@@ -2,8 +2,11 @@
 #define TRACKLET_H_
 
 #include "KalmanFilter.h"
+#include <functional>
 
-using HistoryListener = void(*)(Tracklet&);
+class Tracklet;
+using HistoryListener = std::function<void(Tracklet&)>;
+
 
 class Tracklet
 {

@@ -9,7 +9,7 @@ Tracklet::Tracklet(int idTrack, double x, double y)
     id_(idTrack),
     history_length_(0),
     history_listener_(0),
-    record_distance_threshold_(1),
+    record_distance_threshold_(0.1),
     distance_traveled_(0)
 {
   // initialize filter
@@ -24,9 +24,9 @@ Tracklet::~Tracklet()
 void Tracklet::record()
 {
   auto rec = [this](Eigen::Vector2d pt) {
-    if (this->history_listener_)
-      this->history_listener_(this);
     this->history_last_position_ = pt;
+    if (this->history_listener_)
+      this->history_listener_(*this);
     ++this->history_length_;
   };
 

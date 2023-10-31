@@ -25,6 +25,7 @@ namespace viewer
   private:
     pcl::visualization::PCLVisualizer::Ptr viewer_;
     unsigned long long rays_counter_;
+    std::vector<vtkActor*> addedActors_;
 
   public:
     static void setLidarStatus();
@@ -56,6 +57,8 @@ namespace viewer
     void renderBox(const Box &box, int id, const Color &color = Color(1, 0, 0), float opacity = 1.0);
 
     void renderBox(const BoxQ &box, int id, const Color &color = Color(1, 0, 0), float opacity = 1.0);
+
+    void addActor(vtkActor* actor);
 
     void initCamera(CameraAngle view_angle);
 

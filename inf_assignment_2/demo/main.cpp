@@ -6,6 +6,7 @@
 #include "logging.hpp"
 #include <inttypes.h>
 #include <chrono>
+#include "viewer/TrackletPathManager.hpp"
 
 static const logging::Logger logger("main");
 
@@ -30,6 +31,7 @@ int main(int argc, char *argv[])
 
     // Instantiate the tracker
     Tracker tracker;
+    viewer::TrackletPathManager tpm(tracker);
 
     // Spawn the thread that process the point cloud and performs the clustering
     CloudManager lidar_cloud(log_path, freq, renderer);
@@ -69,6 +71,10 @@ int main(int argc, char *argv[])
         {
             renderer.addCircle(tracks[i].getX(), tracks[i].getY(), tracks[i].getId());
             renderer.addText(tracks[i].getX() + 0.01, tracks[i].getY() + 0.01, std::to_string(tracks[i].getId()));
+        }
+
+        for (auto path : tpm.getPaths()) {
+            renderer.addActor(path->getActor());
         }
 
         renderer.spinViewerOnce();
