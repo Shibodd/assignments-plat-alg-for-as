@@ -1,10 +1,9 @@
 #ifndef TRACKLET_H_
 #define TRACKLET_H_
 
-#include <vector>
-#include <cmath>
-
 #include "KalmanFilter.h"
+
+using HistoryListener = void(*)(Eigen::Vector2d);
 
 class Tracklet
 {
@@ -14,6 +13,9 @@ public:
 
   void predict();
   void update(double x, double y, bool lidarStatus);
+
+  // Records the path this tracklet has taken.
+  void record();
 
   // getters
   inline double getX() const { return kf_.getX(); }
@@ -26,8 +28,13 @@ public:
   inline int getLostCount() const { return lost_count_; }
   inline void increaseLostCount() { lost_count_++; }
   inline void resetLostCount() { lost_count_ = 0; }
+  inline void setHistoryListener(HistoryListener f) { history_listener_ = f; }
 
 private:
+  int history_length_;
+  Eigen::Vector2d history_last_position_;
+  HistoryListener history_listener_;
+
   // filter
   KalmanFilter kf_;
 
@@ -35,6 +42,9 @@ private:
   int id_;
 
   int lost_count_;
+
+  double distance_traveled_;
+  double record_distance_threshold_;
 };
 
 #endif // TRACKLET_H_

@@ -165,4 +165,8 @@ void Tracker::track(const std::vector<double> &centroids_x,
 
   // Add new tracklets
   addTracks(det_association_vector, centroids_x, centroids_y);
+
+  // Tracker recording
+  for (auto& tracker : tracks_)
+    tracker.record();
 }

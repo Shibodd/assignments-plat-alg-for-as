@@ -1,8 +1,16 @@
 #include "tracker/Tracklet.h"
+#include "logging.hpp"
+
+static logging::Logger logger("tracklet");
+
 
 Tracklet::Tracklet(int idTrack, double x, double y)
   : lost_count_(0),
-    id_(idTrack)
+    id_(idTrack),
+    history_length_(0),
+    history_listener_(0),
+    record_distance_threshold_(1),
+    distance_traveled_(0)
 {
   // initialize filter
   kf_.init(0.1);
@@ -11,6 +19,35 @@ Tracklet::Tracklet(int idTrack, double x, double y)
 
 Tracklet::~Tracklet()
 {
+}
+
+void Tracklet::record()
+{
+  auto rec = [this](Eigen::Vector2d pt) {
+    if (this->history_listener_)
+      this->history_listener_(pt);
+    this->history_last_position_ = pt;
+    ++this->history_length_;
+  };
+
+  Eigen::Vector2d position = kf_.getPosition();
+
+  // If this is the first position we try to record, then record it
+  if (history_length_ <= 0) {
+    logger.info("Recording first point for %d.", this->getId());
+    rec(position);
+    distance_traveled_ = 0;
+    return;
+  }
+
+  // If the distance from the current position to the
+  // last recorded position is greater than threshold, record
+  double dist = (history_last_position_ - position).norm();
+  if (dist > record_distance_threshold_) {
+    logger.info("Recording point no. %d for %d (total distance %.1fm).", history_length_, this->getId(), distance_traveled_);
+    rec(position);
+    distance_traveled_ += dist;
+  }
 }
 
 // Predict a single measurement
