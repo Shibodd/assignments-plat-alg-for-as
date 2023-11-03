@@ -11,6 +11,8 @@
 #include <pcl/common/transforms.h>
 #include "Renderer.hpp"
 #include <ekf/RadarMsg.h>
+#include "rmse.hpp"
+
 #define idEKF "idEKF"
 #define idGT "idGT"
 using namespace std;
@@ -26,20 +28,22 @@ vector<VectorXd> estimations;
 vector<VectorXd> ground_truth;
 
 void writeResults(){
-
-    // used to compute the RMSE later
-    Tools tools;
-
-    VectorXd RMSE = tools.CalculateRMSE(estimations, ground_truth);
-    
-    //estimate_x=p_x,estimate_y=p_y,x_gt,y_gt,rmse_x=RMSE(0),rmse_y=RMSE(1)
     std::ofstream myfile;
-    myfile.open("../res.txt", std::ios_base::app);
-    myfile<<estimations.back()[0]<<" "<<estimations.back()[1]<<" "
-          <<ground_truth.back()[0]<<" "<<ground_truth.back()[0]<<" "
-          <<RMSE(0)<<" "<<RMSE(1)<<std::endl;
-    myfile.close();
 
+    auto squared_errors = rmse::calculatePositionSquaredErrors(estimations, ground_truth);
+    assert(squared_errors.size() == estimations.size());
+
+    double rms_error = rmse::calculateRmse(squared_errors);
+
+    myfile.open("res.txt");
+    myfile << rms_error << endl;
+    myfile<<"x_est;y_est;x_gt;y_gt;squared_error"<<std::endl;
+    for (size_t i = 0; i < estimations.size(); ++i) {
+        myfile << estimations[i][0] << ";" << estimations[i][1] << ";"
+               << ground_truth[i][0] << ";" << ground_truth[i][1] << ";"
+               << squared_errors[i] << endl;
+    }
+    myfile.close();
 }
 
 void lidarCb(const nav_msgs::Odometry::ConstPtr& msg){
@@ -117,11 +121,6 @@ void radarCb(const ekf::RadarMsg::ConstPtr& msg){
 }
 
 int main(int argc,char **argv){
-    std::ofstream myfile;
-
-    myfile.open("../res.txt");
-    myfile<<"estimate_x;estimate_y=;x_gt;y_gt;rmse_x=RMSE(0);rmse_y=RMSE(1)"<<std::endl;
-    myfile.close();
     renderer.InitCamera(CameraAngle::TopDown);
 
     // Clear viewer
