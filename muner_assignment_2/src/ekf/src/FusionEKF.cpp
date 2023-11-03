@@ -120,22 +120,17 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 			        0,  0,  1,  0,
 			        0,  0,  0,  1;
 
-	/** TODO
-	 * set the process covariance matrix Q
-	 * use noise_ax = 9 and noise_ay = 9 for your Q matrix.
-	*/
-
-	double sigma_ax = 9;
-	double sigma_ay = 9;
 	double c2 = dt_2;
 	double c3 = dt_3 / 2;
 	double c4 = dt_4 / 4;
-
+	
+	// Process covariance matrix Q
 	ekf_.Q_ = MatrixXd(4, 4);
-	ekf_.Q_ <<  c4 * sigma_ax, 0,             c3 * sigma_ax, 0,
-						  0,             c4 * sigma_ay, 0,             c3 * sigma_ay,
-				      c3 * sigma_ax, 0,             c2 * sigma_ax, 0,
-				      0,             c3 * sigma_ay, 0,             c2 * sigma_ay;
+	ekf_.Q_ <<  c4 * noise_ax, 0,             c3 * noise_ax, 0,
+						  0,             c4 * noise_ay, 0,             c3 * noise_ay,
+				      c3 * noise_ax, 0,             c2 * noise_ax, 0,
+				      0,             c3 * noise_ay, 0,             c2 * noise_ay;
+
 	ekf_.Predict();
 
 	/*****************************************************************************
@@ -147,18 +142,24 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 	 * Update the state and covariance matrices.
 	*/
 
+
 	if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
 		Tools t_;
 		ekf_.H_=t_.CalculateJacobian(ekf_.x_);
 		ekf_.R_=R_radar_;
 		ekf_.UpdateEKF(measurement_pack.raw_measurements_);
 	} else {
-		ekf_.H_=H_laser_;
-		ekf_.R_=R_laser_;
-		ekf_.Update(measurement_pack.raw_measurements_);
+		// ekf_.H_=H_laser_;
+		// ekf_.R_=R_laser_;
+		// ekf_.Update(measurement_pack.raw_measurements_);
 	}
+
+	assert(not ekf_.x_.hasNaN());
+	
 
 	// print the  output
 	cout << "x_ = " << ekf_.x_ << endl;
 	cout << "P_ = " << ekf_.P_ << endl;
+
+	cout << endl;
 }
