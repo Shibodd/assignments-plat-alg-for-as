@@ -43,14 +43,8 @@ FusionEKF::FusionEKF() {
 	//create a 4D state vector, we don't know yet the values of the x state
 	ekf_.x_ = VectorXd(4);
 
-	/** TODO
-	 * Initialize the state matrix P
-	*/
-	ekf_.P_ = MatrixXd(4, 4);
-	ekf_.P_ << ?, 0, 0, 0,
-			  0, ?, 0, 0,
-			  0, 0, ?, 0,
-			  0, 0, 0, ?;
+	// State covariance matrix P
+	ekf_.P_ = MatrixXd::Identity(4, 4) * 9999;
 
 	//the initial transition matrix F_
 	ekf_.F_ = MatrixXd(4, 4);
@@ -118,26 +112,30 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 	previous_timestamp_ = measurement_pack.timestamp_;
 
 
-	/** TODO
-	 * Modify the F matrix so that the time is integrated
-	*/
-	float dt_2 = dt*dt;
-	float dt_3 = ?;
-	float dt_4 = ?;
-	ekf_.F_ << ?, 0, ?, 0,
-			  0, ?, 0, ?,
-			  0, 0, ?, 0,
-			  0, 0, 0, ?;
+	float dt_2 = dt * dt;
+	float dt_3 = dt_2 * dt;
+	float dt_4 = dt_3 * dt;
+	ekf_.F_ <<  1,  0, dt,  0,
+			        0,  1,  0, dt,
+			        0,  0,  1,  0,
+			        0,  0,  0,  1;
 
 	/** TODO
 	 * set the process covariance matrix Q
 	 * use noise_ax = 9 and noise_ay = 9 for your Q matrix.
 	*/
+
+	double sigma_ax = 9;
+	double sigma_ay = 9;
+	double c2 = dt_2;
+	double c3 = dt_3 / 2;
+	double c4 = dt_4 / 4;
+
 	ekf_.Q_ = MatrixXd(4, 4);
-	ekf_.Q_ <<  ?, 0, ?, 0,
-				0, ?, 0, ?,
-				?, 0, ?, 0,
-				0, ?, 0, ?;
+	ekf_.Q_ <<  c4 * sigma_ax, 0,             c3 * sigma_ax, 0,
+						  0,             c4 * sigma_ay, 0,             c3 * sigma_ay,
+				      c3 * sigma_ax, 0,             c2 * sigma_ax, 0,
+				      0,             c3 * sigma_ay, 0,             c2 * sigma_ay;
 	ekf_.Predict();
 
 	/*****************************************************************************
@@ -151,19 +149,13 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
 	if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
 		Tools t_;
-		/** TODO: 
-	 	* Calculate the jacobian and call the UpdateEKF function
-		*/
 		ekf_.H_=t_.CalculateJacobian(ekf_.x_);
 		ekf_.R_=R_radar_;
-		//call the updateEKF function
+		ekf_.UpdateEKF(measurement_pack.raw_measurements_);
 	} else {
 		ekf_.H_=H_laser_;
 		ekf_.R_=R_laser_;
-		/** TODO: 
-	 	* Calculate the update function
-		*/
-		//call the update function
+		ekf_.Update(measurement_pack.raw_measurements_);
 	}
 
 	// print the  output

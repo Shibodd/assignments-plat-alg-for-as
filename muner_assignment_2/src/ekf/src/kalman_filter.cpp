@@ -20,75 +20,50 @@ void KalmanFilter::Init(VectorXd &x_in, MatrixXd &P_in, MatrixXd &F_in,
 }
 
 void KalmanFilter::Predict() {
-	/**
-	TODO: 
-	* predict the state
-	*/
-	x_ = ;
-	MatrixXd Ft = F_.transpose();
-	P_ = ;
+	x_ = F_ * x_;
+	P_ = F_ * P_ * F_.transpose() + Q_;
+}
+
+
+void KalmanFilter::__update(const Eigen::VectorXd &y) {
+	MatrixXd S = H_ * P_ * H_.transpose() + R_;
+	MatrixXd K = P_ * H_.transpose() * S.inverse();
+
+	x_ = x_ + K * y;
+	int x_size = x_.size();
+	MatrixXd I = MatrixXd::Identity(x_size, x_size);
+	P_ = (I - K * H_) * P_;
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
-	/**
-	TODO: 
-	* update the state by using Kalman Filter equations
-	*/
-	VectorXd y = ;
-	MatrixXd Ht = ;//use the transpose() function
-	MatrixXd S = ;
-	MatrixXd Si = ; //use the inverse() function
-	MatrixXd PHt = ;
-	MatrixXd K = ;
-
-	/**
-	TODO: 
-	* Compute the new estimate
-	*/
-	x_ = ;
-	long x_size = x_.size();
-	MatrixXd I = MatrixXd::Identity(x_size, x_size);
-	P_ = ;
+	__update(z - H_ * x_);
 }
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
-	/**
-	TODO: 
-	* update the state by using Extended Kalman Filter equations
-	*/
-  	float pi=atan(1)*4;
+	float pi=atan(1)*4;
 
-	float rho=;
-	float phi=;
+	float rho = z(0); // Range
+	float phi = z(1); // Heading
+	float rho_dot = fabs(rho) < 0.0001? 0 : z(2); // Radial velocity
 	
-	float rho_dot;
-	if (fabs(rho)<0.0001){
-		rho_dot=0;	
-	}else{
-		rho_dot=;
-	}
 	VectorXd z_pred(3);
 	z_pred<<rho, phi, rho_dot;
 
-	VectorXd y = ;
-	
+	Eigen::Vector2d actual_position = x_.head(2);
+	Eigen::Vector2d actual_velocity = x_.tail(2);
+	double actual_range = actual_position.norm();
+
+	VectorXd y(3);
+	y << actual_range,
+	  	 std::tan(actual_position(1) / actual_position(0)), // std::atan2(x_(1), x_(0))
+			 actual_position.dot(actual_velocity);
+		
 	if(y[1]>=pi){ //Normalizing Angles
 		y[1]=y[1]-(2*pi);
 	}else if(y[1]<-pi){
 		y[1]=y[1]+(2*pi);
 	}
-	
-	MatrixXd Ht = ; //use the transpose() function
-	MatrixXd S = ;
-	MatrixXd Si = ; //use the inverse() function
-	MatrixXd PHt = 
-	MatrixXd K = ;
 
-	//new estimate
-	x_ = ;
-	long x_size = x_.size();
-	MatrixXd I = MatrixXd::Identity(x_size, x_size);
-	P_ = ;
-
+	__update(y);
 }
 

@@ -23,10 +23,11 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
 		return rmse;
 	}
 
-	/*****TODO: accumulate squared residuals*****/
-
-
-	//return the result
+	int n = estimations.size();
+	for (int i = 0; i < n; ++i) 
+		rmse += (estimations[i] - ground_truth[i]).array().pow(2).matrix();
+	rmse = (rmse / n).cwiseSqrt();
+	
 	return rmse;
 }
 
