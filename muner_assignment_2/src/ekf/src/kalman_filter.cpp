@@ -1,5 +1,7 @@
-#include "kalman_filter.h"
 #include <iostream>
+#include "kalman_filter.h"
+#include "utils.hpp"
+
 
 using namespace std;
 using Eigen::MatrixXd;
@@ -40,22 +42,27 @@ void KalmanFilter::Update(const VectorXd &z) {
 }
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
-	float pi=atan(1)*4;
-
-	float rho = z(0); // Range
-	float phi = z(1); // Heading
-	float rho_dot = fabs(rho) < 0.0001? 0 : z(2); // Radial velocity
-
-	Eigen::Vector3d z_pred(rho, phi, rho_dot);
-
 	Eigen::Vector2d actual_position = x_.head(2);
 	Eigen::Vector2d actual_velocity = x_.tail(2);
+
+	// The current state in the RADAR's measurement space
 	double actual_range = actual_position.norm();
+	double actual_heading = std::atan2(actual_position(1), actual_position(0));
+	double actual_radial_velocity = actual_position.dot(actual_velocity) / actual_range; // Radial component of actual_velocity
 
-	Eigen::Vector3d hx;
-	hx << actual_range,
-	  	 std::atan2(actual_position(1), actual_position(0)),
-			 actual_position.dot(actual_velocity) / actual_range;
+	double measured_range = z(0);
+	double measured_heading = z(1);
+	double measured_radial_velocity = fabs(z(0)) < 0.0001? 0 : z(2); // If the range is too low, then override the radial velocity to 0
 
-	__update(z_pred - hx);
+	// The difference between the actual state and measured state in the RADAR's space
+	Eigen::Vector3d y(
+		measured_range - actual_range,
+		// Don't just perform a subtraction...
+		// what's the difference between 175deg and -175deg? 10deg, not 350deg.
+		// what's the difference between -175deg and 175deg? -10deg
+		utils::angle_difference_radians(actual_heading, measured_heading),
+		measured_radial_velocity - actual_radial_velocity
+	);
+
+	__update(y);
 }
