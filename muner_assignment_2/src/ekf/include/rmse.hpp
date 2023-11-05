@@ -7,7 +7,7 @@
 
 namespace rmse {
 
-  std::vector<double> calculatePositionSquaredErrors(const std::vector<Eigen::VectorXd>& estimates, const std::vector<Eigen::VectorXd>& ground_truth) {
+  std::vector<double> calculatePositionSquaredErrors(const std::vector<Eigen::Vector2d>& estimates, const std::vector<Eigen::Vector2d>& ground_truth) {
     size_t n = estimates.size();
     assert(n == ground_truth.size());
     assert(n > 0);
@@ -15,7 +15,7 @@ namespace rmse {
     std::vector<double> ans;
     ans.reserve(n);
     for (size_t i = 0; i < n; ++i) {
-      double err = (ground_truth[i].head(2) - estimates[i].head(2)).squaredNorm();
+      double err = (ground_truth[i] - estimates[i]).squaredNorm();
       ans.push_back(err);
     }
     return ans;

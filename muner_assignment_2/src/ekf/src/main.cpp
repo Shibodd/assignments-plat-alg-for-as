@@ -24,15 +24,13 @@ FusionEKF* fusionEKF;
 Renderer renderer;
 Color colorGT  = Color(1,0,0); // red
 Color colorEKF = Color(0,1,0); // green
-int gtCount=0;
-int ekfCount=0;
-vector<VectorXd> estimations;
-vector<VectorXd> ground_truth;
+vector<Eigen::Vector2d> estimations;
+vector<Eigen::Vector2d> ground_truths;
 
 void writeResults(){
     std::ofstream myfile;
 
-    auto squared_errors = rmse::calculatePositionSquaredErrors(estimations, ground_truth);
+    auto squared_errors = rmse::calculatePositionSquaredErrors(estimations, ground_truths);
     assert(squared_errors.size() == estimations.size());
 
     double rms_error = rmse::calculateRmse(squared_errors);
@@ -41,11 +39,27 @@ void writeResults(){
     myfile << rms_error << endl;
     myfile<<"x_est;y_est;x_gt;y_gt;squared_error"<<std::endl;
     for (size_t i = 0; i < estimations.size(); ++i) {
-        myfile << estimations[i][0] << ";" << estimations[i][1] << ";"
-               << ground_truth[i][0] << ";" << ground_truth[i][1] << ";"
+        myfile << estimations[i](0) << ";" << estimations[i](1) << ";"
+               << ground_truths[i](0) << ";" << ground_truths[i](1) << ";"
                << squared_errors[i] << endl;
     }
     myfile.close();
+
+    std::cout << rms_error << std::endl;
+}
+
+void addEstimation() {
+    Eigen::Vector2d estimate(
+        fusionEKF->ekf_.x_(0),
+        fusionEKF->ekf_.x_(1)
+    );
+    estimations.push_back(estimate);
+
+    renderer.addPointToViewer(estimate(0), estimate(1), "ekf", estimations.size(), colorEKF);
+
+    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+    transform.translation() << estimate(0), estimate(1), 0;
+    renderer.updatePose(idEKF,transform);
 }
 
 void lidarCb(const nav_msgs::Odometry::ConstPtr& msg){
@@ -58,38 +72,21 @@ void lidarCb(const nav_msgs::Odometry::ConstPtr& msg){
     meas_package.timestamp_ = msg->header.stamp.sec;
     // here we process the measurement (predict-update)
     fusionEKF->ProcessMeasurement(meas_package);    	  
-    VectorXd estimate(4);
-    estimate(0) = fusionEKF->ekf_.x_(0);
-    estimate(1) = fusionEKF->ekf_.x_(1);
-    estimate(2) = fusionEKF->ekf_.x_(2);
-    estimate(3) = fusionEKF->ekf_.x_(3);
-    estimations.push_back(estimate);
-
-    // here we plot the state x,y
-    renderer.addPointToViewer(fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1),"ekf",ekfCount,colorEKF);
-
-    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1), 0;
-    // Apply the transformation
-    renderer.updatePose(idEKF,transform);
-
-    ekfCount++;
+    addEstimation();
 }
 
 void gtCb(const nav_msgs::Odometry::ConstPtr& msg){
-    renderer.addPointToViewer(msg->pose.pose.position.x, msg->pose.pose.position.y,"gt",gtCount,colorGT);
-    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1), 0;
-    // Apply the transformation
-    renderer.updatePose(idGT,transform);
-    VectorXd gt_values(4);
-    gt_values(0) = fusionEKF->ekf_.x_(0);
-    gt_values(1) = fusionEKF->ekf_.x_(1); 
-    gt_values(2) = 0;
-    gt_values(3) = 0;
-    ground_truth.push_back(gt_values);
+    Eigen::Vector2d gt(
+        msg->pose.pose.position.x,
+        msg->pose.pose.position.y
+    );
+    ground_truths.push_back(gt);
 
-    gtCount++;
+    renderer.addPointToViewer(gt(0), gt(1),"gt",ground_truths.size(),colorGT);
+
+    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+    transform.translation() << gt(0), gt(1), 0;
+    renderer.updatePose(idGT, transform);
 }
 
 
@@ -105,21 +102,7 @@ void radarCb(const ekf::RadarMsg::ConstPtr& msg){
     
     // here we process the measurement (predict-update)
     fusionEKF->ProcessMeasurement(meas_package);  
-    VectorXd estimate(4);
-    estimate(0) = fusionEKF->ekf_.x_(0);
-    estimate(1) = fusionEKF->ekf_.x_(1);
-    estimate(2) = fusionEKF->ekf_.x_(2);
-    estimate(3) = fusionEKF->ekf_.x_(3);
-    estimations.push_back(estimate);
-    // here we plot the state x,y
-
-    renderer.addPointToViewer(fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1),"ekf",ekfCount,colorEKF);
-
-    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1), 0;
-    // Apply the transformation
-    renderer.updatePose(idEKF,transform);
-    ekfCount++;
+    addEstimation();
 }
 
 int main(int argc,char **argv){
