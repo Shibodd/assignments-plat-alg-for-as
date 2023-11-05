@@ -8,8 +8,8 @@
 namespace rmse {
 
   std::vector<double> calculatePositionSquaredErrors(const std::vector<Eigen::Vector2d>& estimates, const std::vector<Eigen::Vector2d>& ground_truth) {
+    assert(estimates.size() == ground_truth.size());
     size_t n = estimates.size();
-    assert(n == ground_truth.size());
     assert(n > 0);
 
     std::vector<double> ans;
@@ -22,7 +22,8 @@ namespace rmse {
   }
 
   double calculateRmse(const std::vector<double>& squared_errors) {
-    double sum = std::accumulate(squared_errors.cbegin(), squared_errors.cend(), 0);
+    double sum = std::accumulate(squared_errors.cbegin(), squared_errors.cend(), (double)0);
+
     size_t n = squared_errors.size();
     return std::sqrt(sum / n);
   }

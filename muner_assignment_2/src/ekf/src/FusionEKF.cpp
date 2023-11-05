@@ -30,7 +30,7 @@ FusionEKF::FusionEKF(const config::config_ty& cfg) {
 	//measurement covariance matrix - radar
 	R_radar_ << cfg.radar_variance.range, 0, 0,
 				0, cfg.radar_variance.heading, 0,
-				0, 0, cfg.radar_variance.range;
+				0, 0, cfg.radar_variance.radial_velocity;
 		
 	//measurement matrix
 	H_laser_ = MatrixXd(2, 4);
