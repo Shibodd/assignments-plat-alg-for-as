@@ -2,6 +2,7 @@
 #include "tools.h"
 #include "Eigen/Dense"
 #include <iostream>
+#include "ini.hpp"
 
 using namespace std;
 using Eigen::MatrixXd;
@@ -11,7 +12,7 @@ using std::vector;
 /*
  * Constructor.
  */
-FusionEKF::FusionEKF() {
+FusionEKF::FusionEKF(const config::config_ty& cfg) {
 	is_initialized_ = false;
 
 	previous_timestamp_ = 0;
@@ -23,13 +24,13 @@ FusionEKF::FusionEKF() {
 	Hj_ = MatrixXd(3, 4);
 
 	//measurement covariance matrix - laser
-	R_laser_ << 0.0225, 0,
-		0, 0.0225;
+	R_laser_ << cfg.laser_variance.x, 0,
+		0, cfg.laser_variance.y;
 
 	//measurement covariance matrix - radar
-	R_radar_ << 0.09, 0, 0,
-				0, 0.0009, 0,
-				0, 0, 0.09;
+	R_radar_ << cfg.radar_variance.range, 0, 0,
+				0, cfg.radar_variance.heading, 0,
+				0, 0, cfg.radar_variance.range;
 		
 	//measurement matrix
 	H_laser_ = MatrixXd(2, 4);
@@ -44,7 +45,7 @@ FusionEKF::FusionEKF() {
 	ekf_.x_ = VectorXd(4);
 
 	// State covariance matrix P
-	ekf_.P_ = MatrixXd::Identity(4, 4) * 9999;
+	ekf_.P_ = MatrixXd::Identity(4, 4) * cfg.initial_variance.variance;
 
 	//the initial transition matrix F_
 	ekf_.F_ = MatrixXd(4, 4);
@@ -52,8 +53,8 @@ FusionEKF::FusionEKF() {
 			  0, 1, 0, 1,
 			  0, 0, 1, 0,
 			  0, 0, 0, 1;
-	noise_ax = 9;
-	noise_ay = 9;
+	noise_ax = cfg.stochastic_noise.x;
+	noise_ay = cfg.stochastic_noise.y;
 }
 
 /**

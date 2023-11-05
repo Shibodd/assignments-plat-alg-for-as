@@ -12,13 +12,15 @@
 #include "Renderer.hpp"
 #include <ekf/RadarMsg.h>
 #include "rmse.hpp"
+#include "config.hpp"
+#include "logging.hpp"
 
 #define idEKF "idEKF"
 #define idGT "idGT"
 using namespace std;
 using namespace lidar_obstacle_detection;
 
-FusionEKF fusionEKF;
+FusionEKF* fusionEKF;
 Renderer renderer;
 Color colorGT  = Color(1,0,0); // red
 Color colorEKF = Color(0,1,0); // green
@@ -55,19 +57,19 @@ void lidarCb(const nav_msgs::Odometry::ConstPtr& msg){
     meas_package.raw_measurements_ << msg->pose.pose.position.x, msg->pose.pose.position.y;
     meas_package.timestamp_ = msg->header.stamp.sec;
     // here we process the measurement (predict-update)
-    fusionEKF.ProcessMeasurement(meas_package);    	  
+    fusionEKF->ProcessMeasurement(meas_package);    	  
     VectorXd estimate(4);
-    estimate(0) = fusionEKF.ekf_.x_(0);
-    estimate(1) = fusionEKF.ekf_.x_(1);
-    estimate(2) = fusionEKF.ekf_.x_(2);
-    estimate(3) = fusionEKF.ekf_.x_(3);
+    estimate(0) = fusionEKF->ekf_.x_(0);
+    estimate(1) = fusionEKF->ekf_.x_(1);
+    estimate(2) = fusionEKF->ekf_.x_(2);
+    estimate(3) = fusionEKF->ekf_.x_(3);
     estimations.push_back(estimate);
 
     // here we plot the state x,y
-    renderer.addPointToViewer(fusionEKF.ekf_.x_(0), fusionEKF.ekf_.x_(1),"ekf",ekfCount,colorEKF);
+    renderer.addPointToViewer(fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1),"ekf",ekfCount,colorEKF);
 
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << fusionEKF.ekf_.x_(0), fusionEKF.ekf_.x_(1), 0;
+    transform.translation() << fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1), 0;
     // Apply the transformation
     renderer.updatePose(idEKF,transform);
 
@@ -77,12 +79,12 @@ void lidarCb(const nav_msgs::Odometry::ConstPtr& msg){
 void gtCb(const nav_msgs::Odometry::ConstPtr& msg){
     renderer.addPointToViewer(msg->pose.pose.position.x, msg->pose.pose.position.y,"gt",gtCount,colorGT);
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << fusionEKF.ekf_.x_(0), fusionEKF.ekf_.x_(1), 0;
+    transform.translation() << fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1), 0;
     // Apply the transformation
     renderer.updatePose(idGT,transform);
     VectorXd gt_values(4);
-    gt_values(0) = fusionEKF.ekf_.x_(0);
-    gt_values(1) = fusionEKF.ekf_.x_(1); 
+    gt_values(0) = fusionEKF->ekf_.x_(0);
+    gt_values(1) = fusionEKF->ekf_.x_(1); 
     gt_values(2) = 0;
     gt_values(3) = 0;
     ground_truth.push_back(gt_values);
@@ -102,25 +104,30 @@ void radarCb(const ekf::RadarMsg::ConstPtr& msg){
     meas_package.timestamp_ = msg->timestamp;
     
     // here we process the measurement (predict-update)
-    fusionEKF.ProcessMeasurement(meas_package);  
+    fusionEKF->ProcessMeasurement(meas_package);  
     VectorXd estimate(4);
-    estimate(0) = fusionEKF.ekf_.x_(0);
-    estimate(1) = fusionEKF.ekf_.x_(1);
-    estimate(2) = fusionEKF.ekf_.x_(2);
-    estimate(3) = fusionEKF.ekf_.x_(3);
+    estimate(0) = fusionEKF->ekf_.x_(0);
+    estimate(1) = fusionEKF->ekf_.x_(1);
+    estimate(2) = fusionEKF->ekf_.x_(2);
+    estimate(3) = fusionEKF->ekf_.x_(3);
     estimations.push_back(estimate);
     // here we plot the state x,y
 
-    renderer.addPointToViewer(fusionEKF.ekf_.x_(0), fusionEKF.ekf_.x_(1),"ekf",ekfCount,colorEKF);
+    renderer.addPointToViewer(fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1),"ekf",ekfCount,colorEKF);
 
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.translation() << fusionEKF.ekf_.x_(0), fusionEKF.ekf_.x_(1), 0;
+    transform.translation() << fusionEKF->ekf_.x_(0), fusionEKF->ekf_.x_(1), 0;
     // Apply the transformation
     renderer.updatePose(idEKF,transform);
     ekfCount++;
 }
 
 int main(int argc,char **argv){
+    logging::setLogLevel(logging::LogLevel::Debug);
+
+    const auto cfg = config::parse_config_file("config.ini");
+    fusionEKF = new FusionEKF(cfg);
+
     renderer.InitCamera(CameraAngle::TopDown);
 
     // Clear viewer

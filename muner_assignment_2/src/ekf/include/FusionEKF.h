@@ -8,13 +8,14 @@
 #include <fstream>
 #include "kalman_filter.h"
 #include "tools.h"
+#include "config.hpp"
 
 class FusionEKF {
 public:
 	/**
 	* Constructor.
 	*/
-	FusionEKF();
+	FusionEKF(const config::config_ty& cfg);
 
 	/**
 	* Destructor.
