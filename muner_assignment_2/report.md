@@ -33,4 +33,4 @@ Decreasing all sensor variances, we see that for values below 1e-9 we start gett
 
 More sane values like 1e-5 just increase the noise and double the RMSE w.r.t the default values.
 
-Other combinations don't really seem to be any interesting - the ideal parameters seem to be the parameters that have the lowest RMSE when using each sensor indipendently.
+Other combinations don't really seem to be of any interest - the ideal parameters seem to be the parameters that have the lowest RMSE when using each sensor indipendently.
