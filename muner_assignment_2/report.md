@@ -6,7 +6,7 @@ So the exact values of RMSE are worthless, but they may be coarsely compared.
 ## Tuning the stochastic noise component
 
 Setting the stochastic noise component to 0 results in the prediction "derailing" off the trajectory and losing the vehicle.
-This cannot be fixed even by using absurdly precise sensors (variance = 1e-12).
+This cannot be fixed even by putting absurd confidence in the sensors (variance = 1e-12).
 
 Exagerating it to extremely high values (1e9) produces an absurd amount of jittering (to the point of rendering plotter.py's output apparently randomic), but in the real-time view it still manages to follow the trajectory.
 
