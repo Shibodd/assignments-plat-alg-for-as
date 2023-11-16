@@ -8,71 +8,81 @@
 #include <string>
 #include <iterator>
 #include "particle/particle_filter.h"
+#include "dist_vector.hpp"
+
 
 static std::default_random_engine gen;
 
-/*
- * TODO
- * This function initialize randomly the particles
- * Input:
- *  std - noise that might be added to the position
- *  nParticles - number of particles
+
+/**
+ * @brief Randomly initialize the particles.
+ * @param min_pos The bottom left corner of the world 
+ * @param max_pos The upper right corner of the world
+ * @param num_particles - number of particles
  */
-void ParticleFilter::init_random(double std[], int nParticles)
+void ParticleFilter::init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_pos, size_t num_particles)
 {
-}
+  min_pos();
+  particles.clear();
+  particles.reserve(num_particles);
 
-// This function initialize the particles using an initial guess
-void ParticleFilter::init(double x, double y, double theta, double std[], int nParticles)
-{
-  num_particles = nParticles;
-  std::normal_distribution<double> dist_x(0, std[0]);
-  std::normal_distribution<double> dist_y(0, std[1]);
-  std::normal_distribution<double> dist_theta(0, std[2]);
+  VectorDist<double, std::uniform_real_distribution, 3> 
 
-  for (int i = 0; i < num_particles; i++)
-  {
-    Particle p;
-    p.id = i;
-    p.x = x + dist_x(gen);
-    p.y = y + dist_y(gen);
-    p.theta = theta + dist_theta(gen);
-    p.weight = 1;
-    particles.push_back(p);
+  auto heading_dist = std::uniform_real_distribution<double>(-M_PI, M_PI);
+
+  for (size_t i = 0; i < num_particles; ++i) {
+    Eigen::Vector2d pos = uniform_random<2>(min_pos, max_pos);
+    double heading = heading_dist(gen);
+
+    particles.emplace_back(i, 1.0, Eigen::Vector3d(pos.x(), pos.y(), heading));
   }
+
 
   is_initialized = true;
 }
 
-/*
- * TODO
- * The predict phase uses the state estimate from the previous timestep to produce an estimate of the state at the current timestep
- * Input:
- *  delta_t  - time elapsed beetween measurements
- *  std_pos  - noise that might be added to the position
- *  velocity - velocity of the vehicle
- *  yaw_rate - current orientation
- * Output:
- *  Updated x,y,theta position
+/**
+ * @brief Initialize the particles using an initial guess of the state.
+ * @param state_guess The initial guess
+ * @param stddev The 
+ * @param num_particles - number of particles
  */
-void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate)
+void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, int num_particles)
 {
-  // for each particle
-  double x, y, theta;
-  if (fabs(yaw_rate) < 0.00001)
-  {
-    // TODO
-  }
-  else
-  {
-    // TODO
-  }
-  std::normal_distribution<double> dist_x(0, std_pos[0]); // the random noise cannot be negative in this case
-  std::normal_distribution<double> dist_y(0, std_pos[1]);
-  std::normal_distribution<double> dist_theta(0, std_pos[2]);
-  // TODO: add the computed noise to the current particles position (x,y,theta)
+  particles.clear();
+  particles.reserve(num_particles);
+  for (int i = 0; i < num_particles; i++)
+    // TODO: 1.0 weight for every particle is probably wrong
+    particles.emplace_back(i, 1.0, gauss_random<3>(state_guess, stddev));
 
-  //}
+  is_initialized = true;
+}
+
+
+/**
+ * @brief Estimate the particle state after dt seconds.
+ * @param dt Time step
+ * @param state_noise The noise to add to the new state
+ * @param velocity The measured speed
+ * @param yaw_rate The measured yaw rate
+*/
+void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double speed, double yaw_rate)
+{
+  double delta_s = speed * dt;
+  double delta_heading = yaw_rate * dt;
+
+  for (auto& particle : particles) {
+    double new_heading = delta_heading + particle.heading();
+
+    Eigen::Vector3d state_delta(
+      delta_s * std::cos(new_heading), // x
+      delta_s * std::sin(new_heading), // y
+      particle.heading() + delta_heading // heading
+    );
+      
+    particle.state += gauss_random<3>(state_delta, state_noise);
+  }
+  
 }
 
 /*
@@ -171,13 +181,13 @@ void ParticleFilter::updateWeights(double std_landmark[],
 void ParticleFilter::resample()
 {
 
-  std::uniform_int_distribution<int> dist_distribution(0, num_particles - 1);
+  std::uniform_int_distribution<int> dist_distribution(0, particles.size());
   double beta = 0.0;
   std::vector<double> weights;
   int index = dist_distribution(gen);
   std::vector<Particle> new_particles;
 
-  for (int i = 0; i < num_particles; i++)
+  for (int i = 0; i < particles.size(); i++)
     weights.push_back(particles[i].weight);
 
   float max_w = *max_element(weights.begin(), weights.end());

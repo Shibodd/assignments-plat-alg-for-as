@@ -2,29 +2,27 @@
 #define PARTICLE_FILTER_H_
 
 #include "particle/helper_functions.h"
+#include <Eigen/Dense>
 
 struct Particle {
+	Eigen::Vector3d state;
+
+	inline double& x() { return state(0); }
+	inline double& y() { return state(1); }
+	inline double& heading() { return state(2); } // orientation of the vehicle (heading angle)
 
 	int id;
-	double x; // denotes the longitudinal position (along the direction of travel)
-	double y; // represents the lateral position
-	double theta; // orientation of the vehicle (heading angle)
 	double weight; // represents the weight/importance of the particle
 	std::vector<int> associations; //stores the associations between measurements and map
 	std::vector<double> sense_x;
 	std::vector<double> sense_y;
 
-	Particle(){x = y = theta = 0.0;}
-	Particle(double x, double y, double theta) : x(x), y(y), theta(theta) { }
+	Particle(int id, double weight, Eigen::Vector3d state) : id(id), state(state), weight(weight) {};
 };
 
 
 
 class ParticleFilter {
-	
-	// Number of particles to draw
-	int num_particles; 
-	 
 	// Flag, if filter is initialized
 	bool is_initialized;
 	
@@ -38,43 +36,35 @@ public:
 
 	// Constructor
 	// @param M Number of particles
-	ParticleFilter() : num_particles(0), is_initialized(false) {}
+	ParticleFilter() : is_initialized(false) {}
 
 	// Destructor
 	~ParticleFilter() {}
 
 	/**
-	 * init Initializes particle filter by initializing particles to Gaussian
-	 *   distribution around first position and all the weights to 1.
-	 * @param x Initial x position [m] (simulated estimate from GPS)
-	 * @param y Initial y position [m]
-	 * @param theta Initial orientation [rad]
-	 * @param std[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
-	 *   standard deviation of yaw [rad]]
-	 * @param nParticles Number of particles used by the algorithm
+	 * @brief Initialize the particles using an initial guess of the state.
+	 * @param state_guess The initial guess
+	 * @param stddev The 
+	 * @param num_particles - number of particles
 	 */
-	void init(double x, double y, double theta, double std[],int nParticles);
-
-		/**
-	 * init Initializes particle filter by randomly distributing the particles 
-	 * around the map.
-	 * @param std[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
-	 *   standard deviation of yaw [rad]]
-	 * @param nParticles Number of particles used by the algorithm
-	 */
-	void init_random(double std[],int nParticles);
-
+	void init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, int num_particles);
 
 	/**
-	 * prediction Predicts the state for the next time step
-	 *   using the process model.
-	 * @param delta_t Time between time step t and t+1 in measurements [s]
-	 * @param std_pos[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
-	 *   standard deviation of yaw [rad]]
-	 * @param velocity Velocity of car from t to t+1 [m/s]
-	 * @param yaw_rate Yaw rate of car from t to t+1 [rad/s]
+	 * @brief Randomly initialize the particles.
+	 * @param min_pos The bottom left corner of the world 
+	 * @param max_pos The upper right corner of the world
+	 * @param num_particles - number of particles
 	 */
-	void prediction(double delta_t, double std_pos[], double velocity, double yaw_rate);
+	void init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_pos, size_t num_particles);
+
+	/**
+	 * @brief Estimate the particle state after dt seconds.
+	 * @param dt Time step
+	 * @param state_noise The noise to add to the new state
+	 * @param velocity The measured speed
+	 * @param yaw_rate The measured yaw rate
+	*/
+	void prediction(double dt, Eigen::Vector3d state_noise, double speed, double yaw_rate);
 	
 	/**
 	 * dataAssociation Finds which observations correspond to which landmarks (likely by using
