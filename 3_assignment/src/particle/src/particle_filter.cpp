@@ -9,7 +9,7 @@
 #include <iterator>
 #include "particle/particle_filter.h"
 #include "vector_distribution.hpp"
-#include "data_association.hpp"
+#include "lsap.hpp"
 #include "gauss.hpp"
 
 static std::default_random_engine gen;
@@ -85,6 +85,32 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
   }
 }
 
+static Eigen::MatrixXd assignment_cost_matrix(
+    const std::vector<Eigen::Vector2d> &observations,
+    const std::vector<Eigen::Vector2d> &map,
+    const Eigen::Matrix2d covariance)
+{
+
+  int obs_count = observations.size();
+  int map_count = map.size();
+
+  Eigen::MatrixXd ans(obs_count, map_count);
+
+  // Compute each element of the cost matrix
+  for (size_t obs_idx = 0; obs_idx < obs_count; ++obs_idx)
+  {
+    for (size_t map_idx = 0; map_idx < map_count; ++map_idx)
+    {
+      // The covariance is invariant across particles => Just mimick the PDF shape!
+      double dist = gauss::mahalanobis2(observations[obs_idx], map[map_idx], covariance);
+      ans(obs_idx, map_idx) = -std::exp(-dist / 2);
+    }
+  }
+
+  return ans;
+}
+
+
 /**
  * @brief Updates the weights for each particle based on the likelihood of the likelihood of the observed measurements.
  * @param landmark_covariance The sensor covariance matrix
@@ -105,8 +131,11 @@ void ParticleFilter::updateWeights(
     for (size_t i = 0; i < transformed_observations.size(); ++i)
       transformed_observations[i] = l2g_transform * observed_landmarks[i];
 
+    // Compute the cost matrix
+    Eigen::MatrixXd association_costs = assignment_cost_matrix(transformed_observations, map_landmarks, landmark_covariance);
+
     // Associate the observations to landmarks
-    std::vector<std::pair<int, int>> associations = point_association(transformed_observations, map_landmarks, landmark_covariance);
+    std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
 
     // Square LSAP - there are no unassociated observations
     assert(associations.size() == transformed_observations.size());
@@ -114,32 +143,27 @@ void ParticleFilter::updateWeights(
     /* 
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
+      
+      We already computed them in association_costs.
     */
     double weight = 1.0;
     for (auto [obs_idx, map_idx] : associations)
-      weight *= gauss::multivariate_gauss_pdf(transformed_observations[obs_idx], map_landmarks[map_idx], landmark_covariance);
+      weight *= association_costs(obs_idx, map_idx); 
     particle.weight = weight;
   }
 }
 
-/*
- * TODO
- * This function resamples the set of particles by repopulating the particles using the weight as metric
- */
+
 void ParticleFilter::resample()
 {
+  naive_wheel_resampling(*this);
+}
 
-  std::uniform_int_distribution<int> dist_distribution(0, particles.size());
-  double beta = 0.0;
-  std::vector<double> weights;
-  int index = dist_distribution(gen);
-  std::vector<Particle> new_particles;
-  std::accumulate()
-  for (int i = 0; i < particles.size(); i++)
-    weights.push_back(particles[i].weight);
+static inline void naive_wheel_resampling(ParticleFilter& pf) {
+  double total_weight = 0.0;
+  for (const auto& particle : pf.particles)
+    total_weight += particle.weight;
 
-  float max_w = *max_element(weights.begin(), weights.end());
-  std::uniform_real_distribution<double> uni_dist(0.0, max_w);
-
-  // TODO write here the resampling technique (feel free to use the above variables)
+  std::uniform_real_distribution<double> dist(0.0, total_weight);
+  dist(gen);
 }
