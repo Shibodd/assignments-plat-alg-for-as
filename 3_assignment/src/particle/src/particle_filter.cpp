@@ -161,11 +161,25 @@ void ParticleFilter::resample()
 }
 
 static inline void naive_wheel_resampling(ParticleFilter& pf) {
-
-
   double total_weight = 0.0;
   for (const auto& particle : pf.particles)
     total_weight += particle.weight;
 
+  std::vector<Particle> new_particles(pf.particles.size());
   std::uniform_real_distribution<double> dist(0.0, total_weight);
+
+  for (int i = 0; i < new_particles.size(); ++i) {
+    double w = dist(gen);
+
+    auto pit = pf.particles.begin();
+    while (true) {
+      w -= *pit.weight;
+      if (w <= 0)
+        break;
+      ++pit;
+    }
+
+    new_particles[i] = *pit;
+    w -= *pit.weight;
+  }
 }
