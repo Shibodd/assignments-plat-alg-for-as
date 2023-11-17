@@ -112,9 +112,10 @@ void ParticleFilter::updateWeights(
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
     */
-    particle.weight = 1.0;
+    double weight = 1.0;
     for (auto [obs_idx, map_idx] : associations)
-      particle.weight *= gauss::multivariate_gauss_pdf(transformed_observations[obs_idx], map_landmarks[map_idx], landmark_covariance);
+      weight *= gauss::multivariate_gauss_pdf(transformed_observations[obs_idx], map_landmarks[map_idx], landmark_covariance);
+    particle.weight = weight;
   }
 }
 
@@ -130,7 +131,7 @@ void ParticleFilter::resample()
   std::vector<double> weights;
   int index = dist_distribution(gen);
   std::vector<Particle> new_particles;
-
+  std::accumulate()
   for (int i = 0; i < particles.size(); i++)
     weights.push_back(particles[i].weight);
 
