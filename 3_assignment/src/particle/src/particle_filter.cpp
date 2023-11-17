@@ -8,11 +8,10 @@
 #include <string>
 #include <iterator>
 #include "particle/particle_filter.h"
-#include "dist_vector.hpp"
+#include "vector_distribution.hpp"
 
 
 static std::default_random_engine gen;
-
 
 /**
  * @brief Randomly initialize the particles.
@@ -22,21 +21,16 @@ static std::default_random_engine gen;
  */
 void ParticleFilter::init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_pos, size_t num_particles)
 {
-  min_pos();
   particles.clear();
   particles.reserve(num_particles);
 
-  VectorDist<double, std::uniform_real_distribution, 3> 
-
-  auto heading_dist = std::uniform_real_distribution<double>(-M_PI, M_PI);
+  Eigen::Vector3d min_state(min_pos.x(), min_pos.y(), -M_PI);
+  Eigen::Vector3d max_state(max_pos.x(), max_pos.y(), M_PI);
+  auto dist = make_vector_distribution<std::uniform_real_distribution, double>(min_state, max_state);
 
   for (size_t i = 0; i < num_particles; ++i) {
-    Eigen::Vector2d pos = uniform_random<2>(min_pos, max_pos);
-    double heading = heading_dist(gen);
-
-    particles.emplace_back(i, 1.0, Eigen::Vector3d(pos.x(), pos.y(), heading));
+    particles.emplace_back(i, 1.0, dist(gen));
   }
-
 
   is_initialized = true;
 }
@@ -51,9 +45,12 @@ void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, i
 {
   particles.clear();
   particles.reserve(num_particles);
+
+  auto dist = make_vector_distribution<std::uniform_real_distribution, double>(state_guess, stddev);
+
+  // TODO: 1.0 weight for every particle is probably wrong
   for (int i = 0; i < num_particles; i++)
-    // TODO: 1.0 weight for every particle is probably wrong
-    particles.emplace_back(i, 1.0, gauss_random<3>(state_guess, stddev));
+    particles.emplace_back(i, 1.0, dist(gen));
 
   is_initialized = true;
 }
@@ -71,18 +68,19 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
   double delta_s = speed * dt;
   double delta_heading = yaw_rate * dt;
 
+  auto dist = make_vector_distribution<std::uniform_real_distribution, double>(Eigen::Vector3d(0,0,0), state_noise);
+
   for (auto& particle : particles) {
-    double new_heading = delta_heading + particle.heading();
+    double new_heading = delta_heading + particle.state.heading();
 
     Eigen::Vector3d state_delta(
       delta_s * std::cos(new_heading), // x
       delta_s * std::sin(new_heading), // y
-      particle.heading() + delta_heading // heading
+      particle.state.heading() + delta_heading // heading
     );
-      
-    particle.state += gauss_random<3>(state_delta, state_noise);
+
+    particle.state.vec() = state_delta + dist(gen);
   }
-  
 }
 
 /*
@@ -98,26 +96,6 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> mapLandmark, std::
 {
   // TODO
   // TIP: Assign to observations[i].id the id of the landmark with the smallest euclidean distance
-}
-
-/*
- * TODO
- * This function transform a local (vehicle) observation into a global (map) coordinates
- * Input:
- *  observation   - A single landmark observation
- *  p             - A single particle
- * Output:
- *  local         - transformation of the observation from local coordinates to global
- */
-LandmarkObs transformation(LandmarkObs observation, Particle p)
-{
-  LandmarkObs global;
-
-  global.id = observation.id;
-  global.x = -1; // TODO
-  global.y = -1; // TODO
-
-  return global;
 }
 
 /*

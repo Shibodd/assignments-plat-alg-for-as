@@ -1,15 +1,15 @@
 #ifndef PARTICLE_FILTER_H_
 #define PARTICLE_FILTER_H_
 
-#include "particle/helper_functions.h"
 #include <Eigen/Dense>
+#include "particle/state.hpp"
 
 struct Particle {
-	Eigen::Vector3d state;
+	state_ty state;
 
-	inline double& x() { return state(0); }
-	inline double& y() { return state(1); }
-	inline double& heading() { return state(2); } // orientation of the vehicle (heading angle)
+	// Returns the local to global transform for the current particle.
+	template <typename T>
+	inline Eigen::Transform<T, 2, 1> local2global() const { Eigen::Rotation2D<T>(state.heading()) * Eigen::Translation<T, 2>(state.head(2)); }
 
 	int id;
 	double weight; // represents the weight/importance of the particle
