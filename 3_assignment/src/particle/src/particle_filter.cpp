@@ -9,7 +9,7 @@
 #include <iterator>
 #include "particle/particle_filter.h"
 #include "vector_distribution.hpp"
-#include "lsap.hpp"
+#include "rectangular_lsap.hpp"
 #include "gauss.hpp"
 
 static std::default_random_engine gen;
@@ -148,24 +148,22 @@ void ParticleFilter::updateWeights(
       We already computed them in association_costs.
     */
     double weight = 1.0;
-    for (auto [obs_idx, map_idx] : associations)
-      weight *= association_costs(obs_idx, map_idx); 
+    for (auto ass : associations)
+      weight *= association_costs(ass.first, ass.second); 
     particle.weight = weight;
   }
 }
 
 
-void ParticleFilter::resample()
-{
-  naive_wheel_resampling(*this);
-}
+
 
 static inline void naive_wheel_resampling(ParticleFilter& pf) {
   double total_weight = 0.0;
   for (const auto& particle : pf.particles)
     total_weight += particle.weight;
 
-  std::vector<Particle> new_particles(pf.particles.size());
+  std::vector<Particle> new_particles;
+  new_particles.reserve(pf.particles.size());
   std::uniform_real_distribution<double> dist(0.0, total_weight);
 
   for (int i = 0; i < new_particles.size(); ++i) {
@@ -173,13 +171,18 @@ static inline void naive_wheel_resampling(ParticleFilter& pf) {
 
     auto pit = pf.particles.begin();
     while (true) {
-      w -= *pit.weight;
+      w -= (*pit).weight;
       if (w <= 0)
         break;
       ++pit;
     }
 
-    new_particles[i] = *pit;
-    w -= *pit.weight;
+    new_particles.push_back(*pit);
+    w -= (*pit).weight;
   }
+}
+
+void ParticleFilter::resample()
+{
+  naive_wheel_resampling(*this);
 }

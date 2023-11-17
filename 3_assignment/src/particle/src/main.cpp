@@ -23,18 +23,29 @@
 
 using namespace lidar_obstacle_detection;
 
-std::vector<Eigen::Vector2d> map_reflectors;
+std::vector<Eigen::Vector2d> map_landmarks;
 
 Renderer renderer;
 
 ParticleFilter pf;
 
-int best_particle_idx;
+size_t best_particle_idx;
 static inline Particle& best_particle() { return pf.particles[best_particle_idx]; }
 static inline void update_best_particle() {
-  auto best_particle_it = std::max_element(pf.particles.cbegin(), pf.particles.cend());
-  assert(best_particle_it != pf.particles.cend());
-  best_particle_idx = std::distance(pf.particles.cbegin(), best_particle_it);
+  assert(pf.particles.size() > 0);
+
+  size_t best_idx = 0;
+  double best_weight = pf.particles[0].weight;
+
+  for (size_t i = 1; i != pf.particles.size(); ++i) {
+    auto& p = pf.particles[i];
+    if (p.weight > best_weight) {
+      best_weight = p.weight;
+      best_idx = i;
+    }
+  }
+  
+  best_particle_idx = best_idx;
 }
 
 std::ofstream myfile;
@@ -130,7 +141,7 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   updateViewerReflector(observed_landmarks);
 
   // Update the particle weights
-  pf.updateWeights(sigma_landmark, observed_landmarks, map_mille);
+  pf.updateWeights(sigma_landmark, observed_landmarks, map_landmarks);
 
   // Resample the particles
   pf.resample();
@@ -152,9 +163,11 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
 
 int main(int argc, char **argv)
 {
+  sigma_landmark = sigma_landmark.inverse().eval();
+
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudReflectors(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::io::loadPCDFile("./data/map_reflector.pcd", *cloudReflectors); // cloud with just the reflectors
-  map_reflectors = createMap(cloudReflectors);
+  map_landmarks = createMap(cloudReflectors);
 
   // Load base cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudMap(new pcl::PointCloud<pcl::PointXYZ>);
