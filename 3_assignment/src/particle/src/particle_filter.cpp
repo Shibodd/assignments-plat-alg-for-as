@@ -88,9 +88,8 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
 static Eigen::MatrixXd assignment_cost_matrix(
     const std::vector<Eigen::Vector2d> &observations,
     const std::vector<Eigen::Vector2d> &map,
-    const Eigen::Matrix2d covariance)
+    const Eigen::Matrix2d covariance_inverse)
 {
-
   int obs_count = observations.size();
   int map_count = map.size();
 
@@ -102,7 +101,7 @@ static Eigen::MatrixXd assignment_cost_matrix(
     for (size_t map_idx = 0; map_idx < map_count; ++map_idx)
     {
       // The covariance is invariant across particles => Just mimick the PDF shape!
-      double dist = gauss::mahalanobis2(observations[obs_idx], map[map_idx], covariance);
+      double dist = gauss::mahalanobis2(observations[obs_idx], map[map_idx], covariance_inverse);
       ans(obs_idx, map_idx) = -std::exp(-dist / 2);
     }
   }
@@ -118,7 +117,7 @@ static Eigen::MatrixXd assignment_cost_matrix(
  * @param map Map class containing map landmarks
  */
 void ParticleFilter::updateWeights(
-    Eigen::Matrix2d landmark_covariance,
+    Eigen::Matrix2d landmark_covariance_inverse,
     const std::vector<Eigen::Vector2d> &observed_landmarks,
     const std::vector<Eigen::Vector2d> &map_landmarks)
 {
@@ -132,7 +131,7 @@ void ParticleFilter::updateWeights(
       transformed_observations[i] = l2g_transform * observed_landmarks[i];
 
     // Compute the cost matrix
-    Eigen::MatrixXd association_costs = assignment_cost_matrix(transformed_observations, map_landmarks, landmark_covariance);
+    Eigen::MatrixXd association_costs = assignment_cost_matrix(transformed_observations, map_landmarks, landmark_covariance_inverse);
 
     // Associate the observations to landmarks
     std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
@@ -160,10 +159,11 @@ void ParticleFilter::resample()
 }
 
 static inline void naive_wheel_resampling(ParticleFilter& pf) {
+
+
   double total_weight = 0.0;
   for (const auto& particle : pf.particles)
     total_weight += particle.weight;
 
   std::uniform_real_distribution<double> dist(0.0, total_weight);
-  dist(gen);
 }

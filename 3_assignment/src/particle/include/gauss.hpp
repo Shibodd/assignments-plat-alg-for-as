@@ -13,10 +13,10 @@ template <typename _Scalar, int K>
 inline double mahalanobis2(
     Eigen::Matrix<_Scalar, K, 1> x,
     Eigen::Matrix<_Scalar, K, 1> mean,
-    Eigen::Matrix<_Scalar, K, K> covariance)
+    Eigen::Matrix<_Scalar, K, K> covariance_inverse)
 {
   Eigen::Matrix<_Scalar, K, 1> delta = x - mean;
-  return delta.dot(covariance.inverse() * delta);
+  return delta.dot(covariance_inverse * delta);
 }
 
 #define PI 3.14159265359
@@ -27,7 +27,7 @@ inline double multivariate_gauss_pdf(
     Eigen::Matrix<_Scalar, K, 1> mean,
     Eigen::Matrix<_Scalar, K, K> covariance)
 {
-  double mah = mahalanobis2(x, mean, covariance);
+  double mah = mahalanobis2(x, mean, covariance.inverse());
   double c = std::pow(2 * PI, K);
 
   return std::exp(-mah / 2) / std::sqrt(c * covariance.determinant());
