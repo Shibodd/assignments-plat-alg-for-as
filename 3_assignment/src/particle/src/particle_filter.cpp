@@ -9,13 +9,14 @@
 #include <iterator>
 #include "particle/particle_filter.h"
 #include "vector_distribution.hpp"
-
+#include "data_association.hpp"
+#include "gauss.hpp"
 
 static std::default_random_engine gen;
 
 /**
  * @brief Randomly initialize the particles.
- * @param min_pos The bottom left corner of the world 
+ * @param min_pos The bottom left corner of the world
  * @param max_pos The upper right corner of the world
  * @param num_particles - number of particles
  */
@@ -28,7 +29,8 @@ void ParticleFilter::init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_po
   Eigen::Vector3d max_state(max_pos.x(), max_pos.y(), M_PI);
   auto dist = make_vector_distribution<std::uniform_real_distribution, double>(min_state, max_state);
 
-  for (size_t i = 0; i < num_particles; ++i) {
+  for (size_t i = 0; i < num_particles; ++i)
+  {
     particles.emplace_back(i, 1.0, dist(gen));
   }
 
@@ -38,7 +40,7 @@ void ParticleFilter::init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_po
 /**
  * @brief Initialize the particles using an initial guess of the state.
  * @param state_guess The initial guess
- * @param stddev The 
+ * @param stddev The standard deviation for each coordinate (simplifying assumption, each coordinate is independent => not a multivariate gaussian)
  * @param num_particles - number of particles
  */
 void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, int num_particles)
@@ -46,7 +48,7 @@ void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, i
   particles.clear();
   particles.reserve(num_particles);
 
-  auto dist = make_vector_distribution<std::uniform_real_distribution, double>(state_guess, stddev);
+  auto dist = make_vector_distribution<std::normal_distribution, double>(state_guess, stddev);
 
   // TODO: 1.0 weight for every particle is probably wrong
   for (int i = 0; i < num_particles; i++)
@@ -55,100 +57,64 @@ void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, i
   is_initialized = true;
 }
 
-
 /**
  * @brief Estimate the particle state after dt seconds.
  * @param dt Time step
  * @param state_noise The noise to add to the new state
  * @param velocity The measured speed
  * @param yaw_rate The measured yaw rate
-*/
+ */
 void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double speed, double yaw_rate)
 {
   double delta_s = speed * dt;
   double delta_heading = yaw_rate * dt;
 
-  auto dist = make_vector_distribution<std::uniform_real_distribution, double>(Eigen::Vector3d(0,0,0), state_noise);
+  auto dist = make_vector_distribution<std::normal_distribution, double>(Eigen::Vector3d(0, 0, 0), state_noise);
 
-  for (auto& particle : particles) {
+  for (auto &particle : particles)
+  {
     double new_heading = delta_heading + particle.state.heading();
 
     Eigen::Vector3d state_delta(
-      delta_s * std::cos(new_heading), // x
-      delta_s * std::sin(new_heading), // y
-      particle.state.heading() + delta_heading // heading
+        delta_s * std::cos(new_heading),         // x
+        delta_s * std::sin(new_heading),         // y
+        particle.state.heading() + delta_heading // heading
     );
 
     particle.state.vec() = state_delta + dist(gen);
   }
 }
 
-/*
- * TODO
- * This function associates the landmarks from the MAP to the landmarks from the OBSERVATIONS
- * Input:
- *  mapLandmark   - landmarks of the map
- *  observations  - observations of the car
- * Output:
- *  Associated observations to mapLandmarks (perform the association using the ids)
+/**
+ * @brief Updates the weights for each particle based on the likelihood of the likelihood of the observed measurements.
+ * @param landmark_covariance The sensor covariance matrix
+ * @param observations Vector of landmark observations
+ * @param map Map class containing map landmarks
  */
-void ParticleFilter::dataAssociation(std::vector<LandmarkObs> mapLandmark, std::vector<LandmarkObs> &observations)
+void ParticleFilter::updateWeights(
+    Eigen::Matrix2d landmark_covariance,
+    const std::vector<Eigen::Vector2d> &observed_landmarks,
+    const std::vector<Eigen::Vector2d> &map_landmarks)
 {
-  // TODO
-  // TIP: Assign to observations[i].id the id of the landmark with the smallest euclidean distance
-}
-
-/*
- * TODO
- * This function updates the weights of each particle
- * Input:
- *  std_landmark   - Sensor noise
- *  observations   - Sensor measurements
- *  map_landmarks  - Map with the landmarks
- * Output:
- *  Updated particle's weight (particles[i].weight *= w)
- */
-void ParticleFilter::updateWeights(double std_landmark[],
-                                   std::vector<LandmarkObs> observations, Map map_landmarks)
-{
-
-  // Creates a vector that stores tha map (this part can be improved)
-  std::vector<LandmarkObs> mapLandmark;
-  for (int j = 0; j < map_landmarks.landmark_list.size(); j++)
+  std::vector<Eigen::Vector2d> transformed_observations(observed_landmarks.size());
+  
+  for (auto& particle : particles)
   {
-    mapLandmark.push_back(LandmarkObs{map_landmarks.landmark_list[j].id_i, map_landmarks.landmark_list[j].x_f, map_landmarks.landmark_list[j].y_f});
-  }
-  for (int i = 0; i < particles.size(); i++)
-  {
+    // Transform observations from local space to global space
+    auto l2g_transform = particle.local2global<double>();
+    for (size_t i = 0; i < transformed_observations.size(); ++i)
+      transformed_observations[i] = l2g_transform * observed_landmarks[i];
 
-    // Before applying the association we have to transform the observations in the global coordinates
-    std::vector<LandmarkObs> transformed_observations;
-    // TODO: for each observation transform it (transformation function)
+    // Associate the observations to landmarks
+    std::vector<std::pair<int, int>> associations = point_association(transformed_observations, map_landmarks, landmark_covariance);
 
-    // TODO: perform the data association (associate the landmarks to the observations)
-
-    particles[i].weight = 1.0;
-    // Compute the probability
-    // The particles final weight can be represented as the product of each measurement’s Multivariate-Gaussian probability density
-    // We compute basically the distance between the observed landmarks and the landmarks in range from the position of the particle
-    for (int k = 0; k < transformed_observations.size(); k++)
-    {
-      double obs_x, obs_y, l_x, l_y;
-      obs_x = transformed_observations[k].x;
-      obs_y = transformed_observations[k].y;
-      // get the associated landmark
-      for (int p = 0; p < mapLandmark.size(); p++)
-      {
-        if (transformed_observations[k].id == mapLandmark[p].id)
-        {
-          l_x = mapLandmark[p].x;
-          l_y = mapLandmark[p].y;
-        }
-      }
-      // How likely a set of landmarks measurements are, given a prediction state of the car
-      double w = exp(-(pow(l_x - obs_x, 2) / (2 * pow(std_landmark[0], 2)) + pow(l_y - obs_y, 2) / (2 * pow(std_landmark[1], 2)))) / (2 * M_PI * std_landmark[0] * std_landmark[1]);
-      particles[i].weight *= w;
-    }
+    /* 
+      The new weight is the product of each measurement’s probability density
+      in its associated map-centered Multivariate-Gaussian.
+    */
+    particle.weight = 1.0;
+    for (auto [obs_idx, map_idx] : associations)
+      particle.weight *= gauss::multivariate_gauss_pdf(transformed_observations[obs_idx], map_landmarks[map_idx], landmark_covariance);
   }
 }
 

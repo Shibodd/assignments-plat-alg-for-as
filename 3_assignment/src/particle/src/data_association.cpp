@@ -26,7 +26,7 @@ static Eigen::MatrixXd assignment_cost_matrix(
   return ans;
 }
 
-std::vector<int> point_association(
+std::vector<std::pair<int, int>> point_association(
     const std::vector<Eigen::Vector2d> &observations,
     const std::vector<Eigen::Vector2d> &map,
     Eigen::Matrix2d covariance)
@@ -35,12 +35,5 @@ std::vector<int> point_association(
   Eigen::MatrixXd association_costs = assignment_cost_matrix(observations, map, covariance);
 
   // Solve the LSAP
-  std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
-
-  // Build the association vector (for each observation, the map idx that it is associated to)
-  std::vector<int> association_vector(observations.size());
-  for (auto association : associations)
-    association_vector[association.first] = association.second;
-
-  return association_vector;
+  return lsap::solve(association_costs);
 }

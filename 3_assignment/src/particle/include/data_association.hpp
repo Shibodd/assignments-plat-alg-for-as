@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <vector>
 
-std::vector<int> point_association(
+std::vector<std::pair<int, int>> point_association(
     const std::vector<Eigen::Vector2d> &observations,
     const std::vector<Eigen::Vector2d> &map,
     Eigen::Matrix2d covariance);
