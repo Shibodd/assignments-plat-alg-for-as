@@ -67,23 +67,15 @@ public:
 	void prediction(double dt, Eigen::Vector3d state_noise, double speed, double yaw_rate);
 	
 	/**
-	 * dataAssociation Finds which observations correspond to which landmarks (likely by using
-	 *   a nearest-neighbors data association).
-	 * @param predicted Vector of predicted landmark observations
-	 * @param observations Vector of landmark observations
-	 */
-	void dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations);
-	
-	/**
-	 * updateWeights Updates the weights for each particle based on the likelihood of the 
-	 *   observed measurements. 
-	 * @param std_landmark[] Array of dimension 2 [standard deviation of range [m],
-	 *   standard deviation of bearing [rad]]
+	 * @brief Updates the weights for each particle based on the likelihood of the likelihood of the observed measurements.
+	 * @param landmark_covariance The sensor covariance matrix
 	 * @param observations Vector of landmark observations
 	 * @param map Map class containing map landmarks
 	 */
-	void updateWeights(double std_landmark[], std::vector<LandmarkObs> observations,
-			Map map_landmarks);
+	void ParticleFilter::updateWeights(
+    Eigen::Matrix2d landmark_covariance,
+    const std::vector<Eigen::Vector2d> &observed_landmarks,
+    const std::vector<Eigen::Vector2d> &map_landmarks)
 	
 	/**
 	 * resample Resamples from the updated set of particles to form
