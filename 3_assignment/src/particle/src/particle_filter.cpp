@@ -108,6 +108,9 @@ void ParticleFilter::updateWeights(
     // Associate the observations to landmarks
     std::vector<std::pair<int, int>> associations = point_association(transformed_observations, map_landmarks, landmark_covariance);
 
+    // Square LSAP - there are no unassociated observations
+    assert(associations.size() == transformed_observations.size());
+
     /* 
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
