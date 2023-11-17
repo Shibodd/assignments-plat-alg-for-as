@@ -25,9 +25,18 @@ using namespace lidar_obstacle_detection;
 
 std::vector<Eigen::Vector2d> map_reflectors;
 
-ParticleFilter pf;
 Renderer renderer;
-std::vector<Particle> best_particles;
+
+ParticleFilter pf;
+
+int best_particle_idx;
+static inline Particle& best_particle() { return pf.particles[best_particle_idx]; }
+static inline void update_best_particle() {
+  auto best_particle_it = std::max_element(pf.particles.cbegin(), pf.particles.cend());
+  assert(best_particle_it != pf.particles.cend());
+  best_particle_idx = std::distance(pf.particles.cbegin(), best_particle_it);
+}
+
 std::ofstream myfile;
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -40,7 +49,9 @@ Eigen::Vector3d sigma_pos(0.05, 0.05, 0.05); //[x,y,theta] movement noise. Try v
 Eigen::Vector2d sigma_landmark(0.4, 0.4);    //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
 std::vector<Color> colors = {Color(1, 0, 0), Color(1, 1, 0), Color(0, 0, 1), Color(1, 0, 1), Color(0, 1, 1)};
 
-// This function updates the position of the particles in the viewer
+/**
+ * @brief Draw all particles
+*/
 void showPCstatus(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<Particle> &particles)
 {
   for (size_t i = 0; i < particles.size(); ++i)
@@ -49,6 +60,10 @@ void showPCstatus(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<P
     cloud->points[i].y = particles[i].state.y();
   }
   renderer.updatePointCloud(cloud, "particles");
+
+  // Draw the best particle
+  renderer.removeShape(circleID + std::to_string(NPARTICLES + 1));
+  renderer.addCircle(best_particle().state.x(), best_particle().state.y(), circleID + std::to_string(NPARTICLES + 1), 0.3, 1, 0, 0);
 }
 
 
@@ -57,7 +72,7 @@ void showPCstatus(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<P
  */ 
 void updateViewerReflector(const std::vector<Eigen::Vector2d>& observed_landmarks)
 {
-  auto bestp_l2g_transform = best_particles.back().local2global<float>();
+  auto bestp_l2g_transform = best_particle().local2global<float>();
 
   // Visualize the reflectors the LiDAR sees
   for (int i = 0; i < observed_landmarks.size(); i++)
@@ -76,7 +91,9 @@ void updateViewerReflector(const std::vector<Eigen::Vector2d>& observed_landmark
     renderer.updateShape(reflectorID + std::to_string(i), 0.0);
 }
 
-// This functions processes the odometry from the forklift (Prediction phase)
+/**
+ * @brief Process the odometry.
+*/
 void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
 {
   static std::chrono::time_point<std::chrono::high_resolution_clock> t_last;
@@ -95,7 +112,9 @@ void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
   t_last = t_now;
 }
 
-// This functions processes the point cloud (Update phase)
+/**
+ * @brief Process the LiDAR PCL.
+*/
 void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
 {
   auto t_start = std::chrono::high_resolution_clock::now();
@@ -110,36 +129,23 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   // Show the reflectors in the frame of reference of the best particle
   updateViewerReflector(observed_landmarks);
 
-  // Update the weights of the particle
+  // Update the particle weights
   pf.updateWeights(sigma_landmark, observed_landmarks, map_mille);
 
   // Resample the particles
   pf.resample();
 
-  // Calculate and output the average weighted error of the particle filter over all time steps so far.
-  Particle best_particle;
-  vector<Particle> particles = pf.particles;
-  double highest_weight = -1.0;
-  for (int i = 0; i < particles.size(); ++i)
-  {
-    if (particles[i].weight > highest_weight)
-    {
-      highest_weight = particles[i].weight;
-      best_particle = particles[i];
-    }
-  }
-  best_particles.push_back(best_particle);
+  // Update the best particle
+  update_best_particle();
 
   // Show the particles in the map
-  showPCstatus(cloud_particles, particles);
-  renderer.removeShape(circleID + std::to_string(NPARTICLES + 1));
-  renderer.addCircle(best_particles.back().x(), best_particles.back().y(), circleID + std::to_string(NPARTICLES + 1), 0.3, 1, 0, 0);
+  showPCstatus(cloud_particles, pf.particles);
 
   // Log the execution time
   auto t_end = std::chrono::high_resolution_clock::now();
   double delta_t = (std::chrono::duration<double, std::milli>(t_end - t_start).count()) / 1000;
 
-  myfile << best_particle.x << " " << best_particle.y << " " << delta_t << '\n';
+  myfile << best_particle().state.x() << " " << best_particle().state.y() << " " << delta_t << '\n';
 
   renderer.SpinViewerOnce();
 }
@@ -182,20 +188,16 @@ int main(int argc, char **argv)
   double GPS_y = 1.70077;
   double GPS_theta = -1.68385;
 
-  // Insert one particle in the best particle set
-  Particle p(GPS_x, GPS_y, GPS_theta);
-  best_particles.push_back(p);
-
   // Init the particle filter
-  pf.init(GPS_x, GPS_y, GPS_theta, sigma_init, NPARTICLES);
+  pf.init(Eigen::Vector3d(GPS_x, GPS_y, GPS_theta), sigma_init, NPARTICLES);
   // pf.init_random(sigma_init,NPARTICLES);
 
   // Render all the particles
   for (int i = 0; i < NPARTICLES; i++)
   {
     pcl::PointXYZ point;
-    point.x = pf.particles[i].x();
-    point.y = pf.particles[i].y();
+    point.x = pf.particles[i].state.x();
+    point.y = pf.particles[i].state.y();
     point.z = 0;
     cloud_particles->push_back(point);
   }
