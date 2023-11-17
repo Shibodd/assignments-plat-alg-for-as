@@ -88,20 +88,20 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
 static Eigen::MatrixXd assignment_cost_matrix(
     const std::vector<Eigen::Vector2d> &observations,
     const std::vector<Eigen::Vector2d> &map,
-    const Eigen::Matrix2d covariance_inverse)
+    const Eigen::Matrix2d& covariance_inverse,
+    Eigen::MatrixXd& ans)
 {
   int obs_count = observations.size();
   int map_count = map.size();
-
-  Eigen::MatrixXd ans(obs_count, map_count);
 
   // Compute each element of the cost matrix
   for (size_t obs_idx = 0; obs_idx < obs_count; ++obs_idx)
   {
     for (size_t map_idx = 0; map_idx < map_count; ++map_idx)
     {
-      // The covariance is invariant across particles => Just mimick the PDF shape!
       double dist = gauss::mahalanobis2(observations[obs_idx], map[map_idx], covariance_inverse);
+
+      // The covariance is invariant across particles => Drop the scaling term from the Multivariate Gaussian PDF
       ans(obs_idx, map_idx) = -std::exp(-dist / 2);
     }
   }
@@ -121,17 +121,19 @@ void ParticleFilter::updateWeights(
     const std::vector<Eigen::Vector2d> &observed_landmarks,
     const std::vector<Eigen::Vector2d> &map_landmarks)
 {
-  std::vector<Eigen::Vector2d> transformed_observations(observed_landmarks.size());
+  size_t n_obs = observed_landmarks.size();
+  std::vector<Eigen::Vector2d> transformed_observations(n_obs);
+  Eigen::MatrixXd association_costs(n_obs, n_obs);
   
   for (auto& particle : particles)
   {
     // Transform observations from local space to global space
     auto l2g_transform = particle.local2global<double>();
-    for (size_t i = 0; i < transformed_observations.size(); ++i)
+    for (size_t i = 0; i < n_obs; ++i)
       transformed_observations[i] = l2g_transform * observed_landmarks[i];
 
     // Compute the cost matrix
-    Eigen::MatrixXd association_costs = assignment_cost_matrix(transformed_observations, map_landmarks, landmark_covariance_inverse);
+    assignment_cost_matrix(transformed_observations, map_landmarks, landmark_covariance_inverse, association_costs);
 
     // Associate the observations to landmarks
     std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
