@@ -12,21 +12,26 @@
 #include <Eigen/Dense>
 
 #include "particle/particle_filter.h"
-
-/*
- * TODO
- * Define the proper number of particles
- */
-#define NPARTICLES 0
 #define circleID "circle_id"
 #define reflectorID "reflector_id"
 
 using namespace lidar_obstacle_detection;
 
+/*
+ * PARAMETERS
+ */
+#define NPARTICLES 0
+Eigen::Vector3d sigma_init(0, 0, 0);         //[x,y,theta] initialization noise.
+Eigen::Vector3d sigma_pos(0.05, 0.05, 0.05); //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
+Eigen::Vector2d sigma_landmark(0.4, 0.4);    //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
+std::vector<Color> colors = {Color(1, 0, 0), Color(1, 1, 0), Color(0, 0, 1), Color(1, 0, 1), Color(0, 1, 1)};
+
+
+std::ofstream myfile;
+pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
+Eigen::Matrix2d landmark_covariance_inverse;
 std::vector<Eigen::Vector2d> map_landmarks;
-
 Renderer renderer;
-
 ParticleFilter pf;
 
 size_t best_particle_idx;
@@ -47,18 +52,6 @@ static inline void update_best_particle() {
   
   best_particle_idx = best_idx;
 }
-
-std::ofstream myfile;
-pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
-
-/*
- * TODO
- * Define the proper noise values
- */
-Eigen::Vector3d sigma_init(0, 0, 0);         //[x,y,theta] initialization noise.
-Eigen::Vector3d sigma_pos(0.05, 0.05, 0.05); //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
-Eigen::Vector2d sigma_landmark(0.4, 0.4);    //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
-std::vector<Color> colors = {Color(1, 0, 0), Color(1, 1, 0), Color(0, 0, 1), Color(1, 0, 1), Color(0, 1, 1)};
 
 /**
  * @brief Draw all particles
@@ -89,7 +82,7 @@ void updateViewerReflector(const std::vector<Eigen::Vector2d>& observed_landmark
   for (int i = 0; i < observed_landmarks.size(); i++)
   {
     // Compute the position of the reflector in global space
-    Eigen::Vector2f pos = bestp_l2g_transform * observed_landmarks[i];
+    Eigen::Vector2f pos = bestp_l2g_transform * observed_landmarks[i].cast<float>();
 
     // Update the pose of the reflectors
     Eigen::Affine3f transform(Eigen::Translation3f(pos.x(), pos.y(), 0));
@@ -141,7 +134,7 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   updateViewerReflector(observed_landmarks);
 
   // Update the particle weights
-  pf.updateWeights(sigma_landmark, observed_landmarks, map_landmarks);
+  pf.updateWeights(landmark_covariance_inverse, observed_landmarks, map_landmarks);
 
   // Resample the particles
   pf.resample();
