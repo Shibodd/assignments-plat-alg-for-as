@@ -26,7 +26,6 @@ Eigen::Vector3d sigma_pos(0.05, 0.05, 0.05); //[x,y,theta] movement noise. Try v
 Eigen::Vector2d sigma_landmark(0.4, 0.4);    //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
 std::vector<Color> colors = {Color(1, 0, 0), Color(1, 1, 0), Color(0, 0, 1), Color(1, 0, 1), Color(0, 1, 1)};
 
-
 std::ofstream myfile;
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
 Eigen::Matrix2d landmark_covariance_inverse;
@@ -35,27 +34,30 @@ Renderer renderer;
 ParticleFilter pf;
 
 size_t best_particle_idx;
-static inline Particle& best_particle() { return pf.particles[best_particle_idx]; }
-static inline void update_best_particle() {
+static inline Particle &best_particle() { return pf.particles[best_particle_idx]; }
+static inline void update_best_particle()
+{
   assert(pf.particles.size() > 0);
 
   size_t best_idx = 0;
   double best_weight = pf.particles[0].weight;
 
-  for (size_t i = 1; i != pf.particles.size(); ++i) {
-    auto& p = pf.particles[i];
-    if (p.weight > best_weight) {
+  for (size_t i = 1; i != pf.particles.size(); ++i)
+  {
+    auto &p = pf.particles[i];
+    if (p.weight > best_weight)
+    {
       best_weight = p.weight;
       best_idx = i;
     }
   }
-  
+
   best_particle_idx = best_idx;
 }
 
 /**
  * @brief Draw all particles
-*/
+ */
 void showPCstatus(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<Particle> &particles)
 {
   for (size_t i = 0; i < particles.size(); ++i)
@@ -70,11 +72,10 @@ void showPCstatus(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std::vector<P
   renderer.addCircle(best_particle().state.x(), best_particle().state.y(), circleID + std::to_string(NPARTICLES + 1), 0.3, 1, 0, 0);
 }
 
-
 /**
  * @brief Show the reflectors in the frame of reference of the best particle
- */ 
-void updateViewerReflector(const std::vector<Eigen::Vector2d>& observed_landmarks)
+ */
+void updateViewerReflector(const std::vector<Eigen::Vector2d> &observed_landmarks)
 {
   auto bestp_l2g_transform = best_particle().local2global<float>();
 
@@ -97,7 +98,7 @@ void updateViewerReflector(const std::vector<Eigen::Vector2d>& observed_landmark
 
 /**
  * @brief Process the odometry.
-*/
+ */
 void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
 {
   static std::chrono::time_point<std::chrono::high_resolution_clock> t_last;
@@ -118,7 +119,7 @@ void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
 
 /**
  * @brief Process the LiDAR PCL.
-*/
+ */
 void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
 {
   auto t_start = std::chrono::high_resolution_clock::now();
@@ -156,7 +157,12 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
 
 int main(int argc, char **argv)
 {
-  sigma_landmark = sigma_landmark.inverse().eval();
+  Eigen::Matrix2d lmk_cov;
+  lmk_cov << 
+      sigma_landmark.x(), 0,
+      0, sigma_landmark.y();
+
+  landmark_covariance_inverse = lmk_cov.inverse();
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudReflectors(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::io::loadPCDFile("./data/map_reflector.pcd", *cloudReflectors); // cloud with just the reflectors
@@ -164,7 +170,7 @@ int main(int argc, char **argv)
 
   // Load base cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudMap(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::io::loadPCDFile("./data/map_pepperl.pcd", *cloudMap);          // total cloud (used for rendering)
+  pcl::io::loadPCDFile("./data/map_pepperl.pcd", *cloudMap); // total cloud (used for rendering)
 
   // Reduce the number of points in the map point cloud (for improving the performance of the rendering)
   pcl::VoxelGrid<pcl::PointXYZ> vg;
