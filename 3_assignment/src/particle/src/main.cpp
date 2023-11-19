@@ -68,14 +68,10 @@ void updateViewerReflector(const std::vector<Eigen::Vector2d> &observed_landmark
   TRACE_FN_SCOPE;
   static const logging::Logger logger("updateViewerReflector");
 
-  Eigen::Isometry2f bestp_l2g_transform = pf.best_particle().local2global<float>();
-
   // Visualize the reflectors the LiDAR sees
   for (int i = 0; i < observed_landmarks.size(); i++)
   {
-    // Compute the position of the reflector in global space
-    Eigen::Vector2f pos = observed_landmarks[i].cast<float>();
-    pos = bestp_l2g_transform * pos;
+    auto& pos = observed_landmarks[i];
 
     // Update the pose of the reflectors
     Eigen::Affine3f transform(Eigen::Translation3f(pos.x(), pos.y(), 0));
@@ -104,11 +100,10 @@ void updateViewerBestAssociations(const std::vector<Eigen::Vector2d> &observed_l
   created = true;
 
   // Add new lines
-  auto transform = pf.best_particle().local2global<float>();
   int i = 0;
   for (auto ass : pf.best_associations) {
-    Eigen::Vector2f obs = transform * observed_landmarks[ass.first].cast<float>();
-    Eigen::Vector2f map = map_landmarks[ass.second].cast<float>();
+    const auto& obs = observed_landmarks[ass.first];
+    const auto& map = map_landmarks[ass.second];
 
     renderer.AddLine(assID + std::to_string(i), pcl::PointXYZ(obs.x(), obs.y(), 0), pcl::PointXYZ(map.x(), map.y(), 0), COLOR_ASSOC, 0.7);
     ++i;
@@ -155,6 +150,11 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
 
   // Update the particle weights
   pf.updateWeights(landmark_covariance_inverse, observed_landmarks, map_landmarks);
+
+  // Transform all observations from best particle local space to global space
+  auto l2g_transform = pf.best_particle().local2global<double>();
+  for (size_t i = 0; i < observed_landmarks.size(); ++i)
+    observed_landmarks[i] = l2g_transform * observed_landmarks[i];
 
   // Show the reflectors in the frame of reference of the best particle
   updateViewerReflector(observed_landmarks);
