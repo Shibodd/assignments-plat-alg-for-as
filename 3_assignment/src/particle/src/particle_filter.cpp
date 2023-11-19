@@ -159,11 +159,11 @@ void ParticleFilter::updateWeights(
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
       
-      We already computed them in association_costs.
+      We already computed them in association_costs, although they're negative for the minimization problem.
     */
     double weight = 1.0;
     for (auto ass : associations)
-      weight *= association_costs(ass.first, ass.second);
+      weight *= -association_costs(ass.first, ass.second);
 
     /*
     Also, what happens if we don't see a map landmark??
@@ -178,10 +178,14 @@ void ParticleFilter::updateWeights(
     {
       best_particle_weight = weight;
       best_particle_idx = i;
+
+      // Store the associations, this might be the best particle and we want to render them
+      best_associations.clear();
+      best_associations.insert(best_associations.begin(), associations.cbegin(), associations.cend());
     }
   }
 
-  best_particle_idx_ = best_particle_idx;  
+  best_particle_idx_ = best_particle_idx;
 }
 
 

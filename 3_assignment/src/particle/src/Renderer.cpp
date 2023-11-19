@@ -42,6 +42,11 @@ namespace lidar_obstacle_detection
 
   }
 
+  void Renderer::AddLine(const std::string& id, pcl::PointXYZ start, pcl::PointXYZ end, Color color, float opacity) {
+    viewer_->addLine(start, end, color.r, color.g, color.b, id);
+    updateShape(id, opacity);
+  }
+
   void Renderer::updatePointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
 		 std::string id) {
     viewer_->updatePointCloud(cloud,id);

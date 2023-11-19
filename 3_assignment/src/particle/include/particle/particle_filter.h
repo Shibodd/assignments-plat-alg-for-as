@@ -16,10 +16,7 @@ struct Particle {
 	}
 
 	int id;
-	double weight; // represents the weight/importance of the particle
-	std::vector<int> associations; //stores the associations between measurements and map
-	std::vector<double> sense_x;
-	std::vector<double> sense_y;
+	double weight;
 
 	Particle(int id, double weight, Eigen::Vector3d state) : id(id), state(state), weight(weight) {};
 };
@@ -34,8 +31,11 @@ class ParticleFilter {
 	std::vector<double> weights;
 
 	int best_particle_idx_;
-	
+
 public:
+
+	// Associations for the best particle
+	std::vector<std::pair<int, int>> best_associations; 
 	
 	// Set of current particles
 	std::vector<Particle> particles;

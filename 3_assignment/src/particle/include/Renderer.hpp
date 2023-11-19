@@ -88,6 +88,10 @@ namespace lidar_obstacle_detection
 
     void InitCamera(CameraAngle view_angle);
 
+    void AddLine(const std::string& id, pcl::PointXYZ start, pcl::PointXYZ end, Color color, float opacity = 1.0);
+
+    void UpdateLine(const std::string& id, pcl::PointXYZ start, pcl::PointXYZ end, Color color, float opacity = 1.0);
+
     bool WasViewerStopped() const;
 
     void SpinViewerOnce() const;

@@ -16,6 +16,7 @@
 #include "particle/particle_filter.h"
 #define bestpID "bestp_id"
 #define reflectorID "reflector_id"
+#define assID "ass_id"
 
 using namespace lidar_obstacle_detection;
 
@@ -32,6 +33,7 @@ static constexpr Color COLOR_PARTICLE(1, 0, 0); // red
 static constexpr Color COLOR_MAP_REFLECTOR(1, 1, 0); // yellow
 static constexpr Color COLOR_OBS_REFLECTOR(0, 1, 1); // cyan
 static constexpr Color COLOR_BESTP(0, 1, 0); // green
+static constexpr Color COLOR_ASSOC(0, 1, 0); // green (lower opacity)
 
 std::ofstream myfile;
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
@@ -87,6 +89,33 @@ void updateViewerReflector(const std::vector<Eigen::Vector2d> &observed_landmark
 }
 
 /**
+ * @brief Renders the assocations of the best particle.
+*/
+void updateViewerBestAssociations(const std::vector<Eigen::Vector2d> &observed_landmarks) {
+  TRACE_FN_SCOPE;
+
+  static bool created = false;
+  if (created) {
+    // Remove old lines
+    for (int i = 0; i < map_landmarks.size(); ++i) {
+      renderer.removeShape(assID + std::to_string(i));
+    }
+  }
+  created = true;
+
+  // Add new lines
+  auto transform = pf.best_particle().local2global<float>();
+  int i = 0;
+  for (auto ass : pf.best_associations) {
+    Eigen::Vector2f obs = transform * observed_landmarks[ass.first].cast<float>();
+    Eigen::Vector2f map = map_landmarks[ass.second].cast<float>();
+
+    renderer.AddLine(assID + std::to_string(i), pcl::PointXYZ(obs.x(), obs.y(), 0), pcl::PointXYZ(map.x(), map.y(), 0), COLOR_ASSOC, 0.7);
+    ++i;
+  }
+}
+
+/**
  * @brief Process the odometry.
  */
 void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
@@ -129,6 +158,9 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
 
   // Show the reflectors in the frame of reference of the best particle
   updateViewerReflector(observed_landmarks);
+
+  // Show the associations of the best particle
+  updateViewerBestAssociations(observed_landmarks);
 
   // Resample the particles
   pf.resample();
