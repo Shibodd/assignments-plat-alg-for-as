@@ -12,7 +12,7 @@ struct Particle {
 	inline Eigen::Transform<T, 2, 1> local2global() const
 	{
 		return Eigen::Translation<T, 2>(state.position().cast<T>())
-    		 * Eigen::Rotation2D<T>(-state.heading());
+    		 * Eigen::Rotation2D<T>(state.heading());
 	}
 
 	int id;

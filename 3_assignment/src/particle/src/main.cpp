@@ -128,13 +128,13 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   std::vector<Eigen::Vector2d> observed_landmarks = extractReflectors(cloud);
 
   // Update the particle weights
-  // pf.updateWeights(landmark_covariance_inverse, observed_landmarks, map_landmarks);
+  pf.updateWeights(landmark_covariance_inverse, observed_landmarks, map_landmarks);
 
   // Show the reflectors in the frame of reference of the best particle
   updateViewerReflector(observed_landmarks);
 
   // Resample the particles
-  // pf.resample();
+  pf.resample();
 
   // Show the particles in the map
   update_drawn_particles(cloud_particles, pf.particles);
@@ -206,8 +206,8 @@ int main(int argc, char **argv)
   double GPS_theta = -1.68385;
 
   // Init the particle filter
-  // pf.init(Eigen::Vector3d(GPS_x, GPS_y, GPS_theta), sigma_init, NPARTICLES);
-  pf.init_random(Eigen::Vector2d(-2.0, -2.0), Eigen::Vector2d(2.0, 2.0), NPARTICLES);
+  pf.init(Eigen::Vector3d(GPS_x, GPS_y, GPS_theta), sigma_init, NPARTICLES);
+  // pf.init_random(Eigen::Vector2d(-2.0, -2.0), Eigen::Vector2d(2.0, 2.0), NPARTICLES);
 
   // Render all the particles
   for (int i = 0; i < pf.particles.size(); i++)

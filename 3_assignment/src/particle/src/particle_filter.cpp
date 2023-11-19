@@ -140,7 +140,7 @@ void ParticleFilter::updateWeights(
   std::vector<std::pair<int, int>> associations;
   associations.reserve(std::min(n_map, n_obs));
 
-  double best_particle_weight = 0;
+  double best_particle_weight = -1000;
   size_t best_particle_idx = -1;
   
   for (size_t i = 0; i < particles.size(); ++i)
@@ -183,7 +183,7 @@ void ParticleFilter::updateWeights(
     }
   }
 
-  // best_particle_idx_ = best_particle_idx;  
+  best_particle_idx_ = best_particle_idx;  
 }
 
 
@@ -198,24 +198,25 @@ static inline void naive_wheel_resampling(ParticleFilter& pf) {
   new_particles.reserve(pf.particles.size());
   std::uniform_real_distribution<double> dist(0.0, total_weight);
 
-  for (int i = 0; i < new_particles.size(); ++i) {
+  while (new_particles.size() < pf.particles.size()) {
     double w = dist(gen);
 
     auto pit = pf.particles.begin();
-    while (true) {
+    auto end = pf.particles.end();
+    for (; pit != end; ++pit) {
       w -= (*pit).weight;
       if (w <= 0)
         break;
-      ++pit;
     }
 
     new_particles.push_back(*pit);
-    w -= (*pit).weight;
   }
+
+  pf.particles.swap(new_particles);
 }
 
 void ParticleFilter::resample()
 {
   TRACE_FN_SCOPE;
-  // naive_wheel_resampling(*this);
+  naive_wheel_resampling(*this);
 }
