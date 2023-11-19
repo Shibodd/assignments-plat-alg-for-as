@@ -77,8 +77,6 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
 
   auto dist = make_vector_distribution<std::normal_distribution, double>(Eigen::Vector3d(0, 0, 0), state_noise);
 
-  double c = speed / yaw_rate;
-
   for (auto &particle : particles)
   {
     Eigen::Vector3d state_delta(

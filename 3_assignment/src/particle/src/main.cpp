@@ -103,12 +103,9 @@ void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
 
   // If we have a "last time"
   if (t_last.time_since_epoch().count() > 0)
-    pf.prediction(dt, sigma_pos, speed, yaw_rate);
+    pf.prediction(dt, sigma_pos, -speed, yaw_rate);
 
   t_last = t_now;
-
-  // update_drawn_particles(cloud_particles, pf.particles);
-  // renderer.SpinViewerOnce();
 }
 
 /**
