@@ -143,24 +143,21 @@ augmenting_path(int nc, const Eigen::MatrixXd& costs, std::vector<double> &u,
 }
 
 
-std::vector<std::pair<int, int>> lsap::solve(Eigen::MatrixXd costs, bool maximize)
+void lsap::solve(Eigen::MatrixXd costs, std::vector<std::pair<int, int>>& assignments)
 {
-  std::vector<std::pair<int, int>> assignments;
-
+  assignments.clear();
   // handle trivial inputs
   if (costs.rows() == 0 || costs.cols() == 0)
   {
-    return assignments;
+    return;
   }
 
   // tall rectangular cost matrix must be transposed
   bool transpose = costs.cols() < costs.rows();
 
-  if (transpose)
+  if (transpose) {
     costs.transposeInPlace();
-    
-  if (maximize)
-    costs = (-costs).eval();
+  }
 
   int nr = costs.rows();
   int nc = costs.cols();
@@ -246,6 +243,4 @@ std::vector<std::pair<int, int>> lsap::solve(Eigen::MatrixXd costs, bool maximiz
       assignments.push_back(std::make_pair(i, col4row[i]));
     }
   }
-
-  return assignments;
 }

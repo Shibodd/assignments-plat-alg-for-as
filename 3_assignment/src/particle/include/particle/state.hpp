@@ -19,6 +19,8 @@ public:
 	inline const double& y() const { return state_(1); }
 	inline const double& heading() const { return state_(1); }
 
+	inline const Eigen::Vector2d position() const { return state_.head(2); }
+
 	inline Eigen::Vector3d& vec() { return state_; }
 	inline const Eigen::Vector3d& vec() const { return state_; }
 };

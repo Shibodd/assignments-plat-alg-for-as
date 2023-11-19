@@ -53,7 +53,7 @@ public:
   SolverException(int code) : code(code) {}
 };
 
-std::vector<std::pair<int, int>> solve(Eigen::MatrixXd costs, bool maximize = false);
+void solve(Eigen::MatrixXd costs, std::vector<std::pair<int, int>>& assignments);
 
 } // namespace lsap
 #endif // !RECTANGULR_LSAP_H

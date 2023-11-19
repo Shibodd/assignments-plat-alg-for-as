@@ -12,6 +12,8 @@
 #include "rectangular_lsap.hpp"
 #include "gauss.hpp"
 
+#include "logging.hpp"
+
 static std::default_random_engine gen;
 
 /**
@@ -22,6 +24,8 @@ static std::default_random_engine gen;
  */
 void ParticleFilter::init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_pos, size_t num_particles)
 {
+  TRACE_FN_SCOPE;
+
   particles.clear();
   particles.reserve(num_particles);
 
@@ -31,7 +35,8 @@ void ParticleFilter::init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_po
 
   for (size_t i = 0; i < num_particles; ++i)
   {
-    particles.emplace_back(i, 1.0, dist(gen));
+    auto state = dist(gen);
+    particles.emplace_back(i, 1.0, state);
   }
 
   is_initialized = true;
@@ -45,12 +50,13 @@ void ParticleFilter::init_random(Eigen::Vector2d min_pos, Eigen::Vector2d max_po
  */
 void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, int num_particles)
 {
+  TRACE_FN_SCOPE;
+
   particles.clear();
   particles.reserve(num_particles);
 
   auto dist = make_vector_distribution<std::normal_distribution, double>(state_guess, stddev);
 
-  // TODO: 1.0 weight for every particle is probably wrong
   for (int i = 0; i < num_particles; i++)
     particles.emplace_back(i, 1.0, dist(gen));
 
@@ -66,22 +72,22 @@ void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, i
  */
 void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double speed, double yaw_rate)
 {
-  double delta_s = speed * dt;
-  double delta_heading = yaw_rate * dt;
+  TRACE_FN_SCOPE;
+  static const logging::Logger logger("prediction");
 
   auto dist = make_vector_distribution<std::normal_distribution, double>(Eigen::Vector3d(0, 0, 0), state_noise);
 
+  double c = speed / yaw_rate;
+
   for (auto &particle : particles)
   {
-    double new_heading = delta_heading + particle.state.heading();
-
     Eigen::Vector3d state_delta(
-        delta_s * std::cos(new_heading),         // x
-        delta_s * std::sin(new_heading),         // y
-        particle.state.heading() + delta_heading // heading
+      speed * std::cos(particle.state.heading()),
+      speed * std::sin(particle.state.heading()),
+      yaw_rate
     );
 
-    particle.state.vec() = state_delta + dist(gen);
+    particle.state.vec() += dt * (state_delta + dist(gen));
   }
 }
 
@@ -91,6 +97,8 @@ static Eigen::MatrixXd assignment_cost_matrix(
     const Eigen::Matrix2d& covariance_inverse,
     Eigen::MatrixXd& ans)
 {
+  TRACE_FN_SCOPE;
+
   int obs_count = observations.size();
   int map_count = map.size();
 
@@ -121,12 +129,23 @@ void ParticleFilter::updateWeights(
     const std::vector<Eigen::Vector2d> &observed_landmarks,
     const std::vector<Eigen::Vector2d> &map_landmarks)
 {
+  TRACE_FN_SCOPE;
+
   size_t n_obs = observed_landmarks.size();
+  size_t n_map = map_landmarks.size();
+
   std::vector<Eigen::Vector2d> transformed_observations(n_obs);
-  Eigen::MatrixXd association_costs(n_obs, n_obs);
+  Eigen::MatrixXd association_costs(n_obs, n_map);
+
+  std::vector<std::pair<int, int>> associations;
+  associations.reserve(std::min(n_map, n_obs));
+
+  double best_particle_weight = 0;
+  size_t best_particle_idx = -1;
   
-  for (auto& particle : particles)
+  for (size_t i = 0; i < particles.size(); ++i)
   {
+    auto& particle = particles[i];
     // Transform observations from local space to global space
     auto l2g_transform = particle.local2global<double>();
     for (size_t i = 0; i < n_obs; ++i)
@@ -136,10 +155,7 @@ void ParticleFilter::updateWeights(
     assignment_cost_matrix(transformed_observations, map_landmarks, landmark_covariance_inverse, association_costs);
 
     // Associate the observations to landmarks
-    std::vector<std::pair<int, int>> associations = lsap::solve(association_costs);
-
-    // Square LSAP - there are no unassociated observations
-    assert(associations.size() == transformed_observations.size());
+    lsap::solve(association_costs, associations);
 
     /* 
       The new weight is the product of each measurement’s probability density
@@ -149,9 +165,25 @@ void ParticleFilter::updateWeights(
     */
     double weight = 1.0;
     for (auto ass : associations)
-      weight *= association_costs(ass.first, ass.second); 
-    particle.weight = weight;
+      weight *= association_costs(ass.first, ass.second);
+
+    /*
+    Also, what happens if we don't see a map landmark??
+    Maybe we could use an heuristic to reduce the weight...
+    
+    Here we just assume the probability of not seeing a landmark is constant
+    and the same for all particles. => no need to compute it as it doesn't affect ordering
+    */
+
+    // Compute the best particle
+    if (weight > best_particle_weight)
+    {
+      best_particle_weight = weight;
+      best_particle_idx = i;
+    }
   }
+
+  // best_particle_idx_ = best_particle_idx;  
 }
 
 
@@ -184,5 +216,6 @@ static inline void naive_wheel_resampling(ParticleFilter& pf) {
 
 void ParticleFilter::resample()
 {
-  naive_wheel_resampling(*this);
+  TRACE_FN_SCOPE;
+  // naive_wheel_resampling(*this);
 }

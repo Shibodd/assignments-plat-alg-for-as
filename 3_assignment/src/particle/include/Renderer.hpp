@@ -24,7 +24,7 @@ namespace lidar_obstacle_detection
 
     float r, g, b;
 
-    Color(float setR, float setG, float setB)
+    constexpr Color(float setR, float setG, float setB)
         : r(setR), g(setG), b(setB)
     {}
   };
@@ -66,7 +66,7 @@ namespace lidar_obstacle_detection
     
     void updatePointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::string id );
 
-    void addCircle(float centroid_x, float centroid_y, std::string id, float radius,int r, int g, int b);
+    void addCircle(float centroid_x, float centroid_y, std::string id, float radius, Color color);
     
     void ClearRays();
 

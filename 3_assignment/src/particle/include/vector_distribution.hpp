@@ -13,16 +13,17 @@ public:
   template <typename... ArgType>
   VectorDistribution(Eigen::Matrix<ArgType, Size, 1>... args)
   {
-    for (int i = 0; i < Size; ++i)
+    for (int i = 0; i < Size; ++i) {
       dists[i] = Distribution<DataType>((args(i))...); // this is actually pretty cool
+    }
   }
 
   template <typename Generator>
-  Eigen::Matrix<DataType, Size, 1> operator()(Generator generator)
+  Eigen::Matrix<DataType, Size, 1> operator()(Generator& generator)
   {
     Eigen::Matrix<DataType, Size, 1> ans;
     for (int i = 0; i < Size; ++i)
-      ans[i] = dists[i](generator);
+      ans(i) = dists[i](generator);
     return ans;
   }
 };

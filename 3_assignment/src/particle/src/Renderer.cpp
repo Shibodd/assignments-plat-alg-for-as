@@ -10,7 +10,7 @@
 namespace lidar_obstacle_detection
 {
 
-  void Renderer::addCircle(float centroid_x, float centroid_y,std::string id, float radius, int r, int g, int b){
+  void Renderer::addCircle(float centroid_x, float centroid_y,std::string id, float radius, Color color){
 
     pcl::ModelCoefficients circle_coeff;
     circle_coeff.values.resize (3);    // We need 3 values
@@ -21,7 +21,7 @@ namespace lidar_obstacle_detection
     viewer_->addCircle(circle_coeff,id,0);  
 
     viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_REPRESENTATION, 1, id);
-    viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, r, g, b, id);
+    viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, color.r, color.g, color.b, id);
     viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 1.0, id);
   }
 

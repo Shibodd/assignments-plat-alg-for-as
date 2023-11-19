@@ -11,6 +11,12 @@ struct Particle {
 	template <typename T>
 	inline Eigen::Transform<T, 2, 1> local2global() const { Eigen::Translation<T, 2>(state.vec().head(2).cast<T>()) * Eigen::Rotation2D<T>(state.heading()); }
 
+	inline Eigen::Isometry2f local2g()
+	{
+		return Eigen::Translation2f(state.position().cast<float>())
+    		 * Eigen::Rotation2D<float>(-state.heading());
+	}
+
 	int id;
 	double weight; // represents the weight/importance of the particle
 	std::vector<int> associations; //stores the associations between measurements and map
@@ -28,6 +34,8 @@ class ParticleFilter {
 	
 	// Vector of weights of all particles
 	std::vector<double> weights;
+
+	int best_particle_idx_;
 	
 public:
 	
@@ -99,6 +107,17 @@ public:
 	const bool initialized() const {
 		return is_initialized;
 	}
+
+	inline Particle& best_particle() {
+		assert(is_initialized && "Particle filter not initialized yet!");
+		return particles[best_particle_idx_];
+	}
+	
+	inline const Particle& best_particle() const {
+  	assert(is_initialized && "Particle filter not initialized yet!");
+		return particles[best_particle_idx_];
+	}
+
 };
 
 
