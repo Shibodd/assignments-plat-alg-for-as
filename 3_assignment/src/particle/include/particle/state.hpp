@@ -17,7 +17,7 @@ public:
 
 	inline const double& x() const { return state_(0); }
 	inline const double& y() const { return state_(1); }
-	inline const double& heading() const { return state_(1); }
+	inline const double& heading() const { return state_(2); }
 
 	inline const Eigen::Vector2d position() const { return state_.head(2); }
 
