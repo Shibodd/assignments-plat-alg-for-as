@@ -66,7 +66,7 @@ void updateViewerReflector(const std::vector<Eigen::Vector2d> &observed_landmark
   TRACE_FN_SCOPE;
   static const logging::Logger logger("updateViewerReflector");
 
-  Eigen::Isometry2f bestp_l2g_transform = pf.best_particle().local2g();
+  Eigen::Isometry2f bestp_l2g_transform = pf.best_particle().local2global<float>();
 
   // Visualize the reflectors the LiDAR sees
   for (int i = 0; i < observed_landmarks.size(); i++)

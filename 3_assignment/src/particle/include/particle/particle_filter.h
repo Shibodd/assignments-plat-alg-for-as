@@ -9,12 +9,10 @@ struct Particle {
 
 	// Returns the local to global transform for the current particle.
 	template <typename T>
-	inline Eigen::Transform<T, 2, 1> local2global() const { Eigen::Translation<T, 2>(state.vec().head(2).cast<T>()) * Eigen::Rotation2D<T>(state.heading()); }
-
-	inline Eigen::Isometry2f local2g()
+	inline Eigen::Transform<T, 2, 1> local2global() const
 	{
-		return Eigen::Translation2f(state.position().cast<float>())
-    		 * Eigen::Rotation2D<float>(-state.heading());
+		return Eigen::Translation<T, 2>(state.position().cast<T>())
+    		 * Eigen::Rotation2D<T>(-state.heading());
 	}
 
 	int id;
