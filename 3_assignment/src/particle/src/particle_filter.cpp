@@ -154,6 +154,16 @@ void ParticleFilter::updateWeights(
 
     // Associate the observations to landmarks
     lsap::solve(association_costs, associations);
+    
+    // Remove invalid associations
+    associations.erase(std::remove_if(associations.begin(), associations.end(),
+      [map_landmarks, transformed_observations] (std::pair<int, int> ass) {
+        auto delta = transformed_observations[ass.first] - map_landmarks[ass.second];
+
+        constexpr double INVALID_ASS_DIST_THRESHOLD = 3 * 3;
+        return delta.squaredNorm() >= INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
+      }
+    ), associations.end());
 
     /* 
       The new weight is the product of each measurement’s probability density
