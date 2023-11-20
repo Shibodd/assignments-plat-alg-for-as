@@ -30,8 +30,8 @@ class ParticleFilter {
 	// Vector of weights of all particles
 	std::vector<double> weights;
 
-	int best_particle_idx_;
-
+	size_t best_particle_idx_;
+	
 public:
 
 	// Associations for the best particle

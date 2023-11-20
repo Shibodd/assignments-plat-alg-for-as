@@ -23,7 +23,7 @@ using namespace lidar_obstacle_detection;
 /*
  * PARAMETERS
  */
-#define NPARTICLES 100
+#define NPARTICLES 2000
 Eigen::Vector3d sigma_init(0, 0, 0);         //[x,y,theta] initialization noise.
 Eigen::Vector3d sigma_pos(0.05, 0.05, 0.05); //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
 Eigen::Vector2d sigma_landmark(0.4, 0.4);    //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
@@ -162,17 +162,20 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   // Show the associations of the best particle
   updateViewerBestAssociations(observed_landmarks);
 
-  // Resample the particles
-  pf.resample();
-
   // Show the particles in the map
   update_drawn_particles(cloud_particles, pf.particles);
+
+  // Copy the best particle state before resampling
+  auto best_particle_state = pf.best_particle().state;
+
+  // Resample the particles
+  pf.resample();
 
   // Log the execution time
   auto t_end = std::chrono::high_resolution_clock::now();
   double delta_t = (std::chrono::duration<double, std::milli>(t_end - t_start).count()) / 1000;
 
-  myfile << pf.best_particle().state.x() << " " << pf.best_particle().state.y() << " " << delta_t << '\n';
+  myfile << best_particle_state.x() << " " << best_particle_state.y() << " " << delta_t << '\n';
 
   renderer.SpinViewerOnce();
 }

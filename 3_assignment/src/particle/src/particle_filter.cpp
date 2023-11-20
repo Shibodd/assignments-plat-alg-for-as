@@ -89,7 +89,7 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
   }
 }
 
-static Eigen::MatrixXd assignment_cost_matrix(
+static void assignment_cost_matrix(
     const std::vector<Eigen::Vector2d> &observations,
     const std::vector<Eigen::Vector2d> &map,
     const Eigen::Matrix2d& covariance_inverse,
@@ -105,14 +105,10 @@ static Eigen::MatrixXd assignment_cost_matrix(
   {
     for (size_t map_idx = 0; map_idx < map_count; ++map_idx)
     {
-      double dist = gauss::mahalanobis2(observations[obs_idx], map[map_idx], covariance_inverse);
-
-      // The covariance is invariant across particles => Drop the scaling term from the Multivariate Gaussian PDF
-      ans(obs_idx, map_idx) = -std::exp(-dist / 2);
+      Eigen::Vector2d delta = observations[obs_idx] - map[map_idx];
+      ans(obs_idx, map_idx) = delta.dot(delta);
     }
   }
-
-  return ans;
 }
 
 
@@ -128,6 +124,7 @@ void ParticleFilter::updateWeights(
     const std::vector<Eigen::Vector2d> &map_landmarks)
 {
   TRACE_FN_SCOPE;
+  MAKE_FN_LOGGER;
 
   size_t n_obs = observed_landmarks.size();
   size_t n_map = map_landmarks.size();
@@ -156,32 +153,38 @@ void ParticleFilter::updateWeights(
     lsap::solve(association_costs, associations);
     
     // Remove invalid associations
-    associations.erase(std::remove_if(associations.begin(), associations.end(),
-      [map_landmarks, transformed_observations] (std::pair<int, int> ass) {
-        auto delta = transformed_observations[ass.first] - map_landmarks[ass.second];
-
-        constexpr double INVALID_ASS_DIST_THRESHOLD = 3 * 3;
-        return delta.squaredNorm() >= INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
+    auto invalid_ass_begin = std::remove_if(associations.begin(), associations.end(),
+      [association_costs] (std::pair<int, int> ass) {
+        constexpr double INVALID_ASS_DIST_THRESHOLD = 3;
+        return association_costs(ass.first, ass.second) > INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
       }
-    ), associations.end());
+    );
+    auto invalid_ass_end = associations.end();
+    size_t invalid_ass_count = std::distance(invalid_ass_begin, invalid_ass_end);
+    associations.erase(invalid_ass_begin, invalid_ass_end);
 
     /* 
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
+
+      But that's slow and the covariance is invariant across particles
+      - so just mimick it with the euclidean distance instead.
       
-      We already computed them in association_costs, although they're negative for the minimization problem.
+      We already computed them in association_costs.
     */
     double weight = 1.0;
     for (auto ass : associations)
-      weight *= -association_costs(ass.first, ass.second);
+      weight *= std::exp(-association_costs(ass.first, ass.second));
 
     /*
-    Also, what happens if we don't see a map landmark??
-    Maybe we could use an heuristic to reduce the weight...
-    
-    Here we just assume the probability of not seeing a landmark is constant
-    and the same for all particles. => no need to compute it as it doesn't affect ordering
+    Also, what happens if we have unassociated map landmarks (the particle doesn't see them)?
+    Use an heuristic: assume the probability of not seeing a landmark is constant.
+    Penalize invalid associations.
     */
+    constexpr double INVALID_ASSOCIATION_PROBABILITY = 0.1;
+    weight *= std::pow(INVALID_ASSOCIATION_PROBABILITY, invalid_ass_count);
+
+    particle.weight = weight;
 
     // Compute the best particle
     if (weight > best_particle_weight)

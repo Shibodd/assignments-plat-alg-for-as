@@ -39,6 +39,8 @@ public:
   #undef MAKE_LEVEL_METHOD
 }; // Logger
 
+#define MAKE_FN_LOGGER static const logging::Logger logger(__func__)
+
 #ifdef TRACE_ENABLED
 struct ScopeTraceLogger {
   logging::Logger logger;
