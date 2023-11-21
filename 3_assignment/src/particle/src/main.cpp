@@ -37,7 +37,7 @@ static constexpr Color COLOR_ASSOC(0, 1, 0); // green (lower opacity)
 
 std::ofstream myfile;
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
-Eigen::Matrix2d landmark_covariance_inverse;
+Eigen::Matrix2d landmark_covariance;
 std::vector<Eigen::Vector2d> map_landmarks;
 Renderer renderer;
 ParticleFilter pf;
@@ -105,7 +105,7 @@ void updateViewerBestAssociations(const std::vector<Eigen::Vector2d> &observed_l
     const auto& obs = observed_landmarks[std::get<0>(ass)];
     const auto& map = map_landmarks[std::get<1>(ass)];
 
-    renderer.AddLine(assID + std::to_string(i), pcl::PointXYZ(obs.x(), obs.y(), 0), pcl::PointXYZ(map.x(), map.y(), 0), COLOR_ASSOC, std::get<2>(ass));
+    renderer.AddLine(assID + std::to_string(i), pcl::PointXYZ(obs.x(), obs.y(), 0), pcl::PointXYZ(map.x(), map.y(), 0), COLOR_ASSOC, 0.7);
     ++i;
   }
 }
@@ -149,7 +149,7 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   std::vector<Eigen::Vector2d> observed_landmarks = extractReflectors(cloud);
 
   // Update the particle weights
-  pf.updateWeights(landmark_covariance_inverse, observed_landmarks, map_landmarks);
+  pf.updateWeights(landmark_covariance, observed_landmarks, map_landmarks);
 
   // Transform all observations from best particle local space to global space
   auto l2g_transform = pf.best_particle().local2global<double>();
@@ -192,12 +192,9 @@ int main(int argc, char **argv)
 
   logger.info("Starting.");
 
-  Eigen::Matrix2d lmk_cov;
-  lmk_cov << 
+  landmark_covariance << 
       sigma_landmark.x(), 0,
       0, sigma_landmark.y();
-
-  landmark_covariance_inverse = lmk_cov.inverse();
   
   logger.info("Loading reflectors.");
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudReflectors(new pcl::PointCloud<pcl::PointXYZ>);

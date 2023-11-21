@@ -27,7 +27,7 @@ inline double multivariate_gauss_pdf(
     Eigen::Matrix<_Scalar, K, 1> mean,
     Eigen::Matrix<_Scalar, K, K> covariance)
 {
-  double mah = mahalanobis2(x, mean, covariance.inverse());
+  double mah = mahalanobis2(x, mean, covariance.inverse().eval());
   double c = std::pow(2 * PI, K);
 
   return std::exp(-mah / 2) / std::sqrt(c * covariance.determinant());

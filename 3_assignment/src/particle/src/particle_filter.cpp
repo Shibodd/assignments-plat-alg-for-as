@@ -92,9 +92,11 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
 static void nn_data_association(
     const std::vector<Eigen::Vector2d> &observations,
     const std::vector<Eigen::Vector2d> &maps,
-    std::vector<std::tuple<int, int>>& associations,
+    std::vector<std::tuple<int, int, double>>& associations,
     std::vector<bool>& obs_is_associated
 ) {
+  TRACE_FN_SCOPE;
+
   constexpr double INVALID_ASS_DIST_THRESHOLD = 3;
   constexpr double THR = INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
 
@@ -105,17 +107,19 @@ static void nn_data_association(
   // Find the nearest neighbouring observation for each map landmark
   for (size_t map_idx = 0; map_idx < maps.size(); ++map_idx) {
     auto& map = maps[map_idx];
-    double min_dist_2 = std::numeric_limits<double>().min();
+    double min_dist_2 = std::numeric_limits<double>().max();
     size_t min_idx = -1;
 
     for (size_t obs_idx = 0; obs_idx < observations.size(); ++obs_idx) {
-      auto& obs = observations[obs_idx];
-      double dist2 = (obs - map).squaredNorm();
+      if (obs_is_associated[obs_idx])
+        continue;
 
-      if (dist2 < THR && dist2 < min_dist_2) {
-        min_dist_2 = dist2;
-        min_idx = obs_idx;
-      }
+      double dist2 = (observations[obs_idx] - map).squaredNorm();
+      if (dist2 >= THR || dist2 > min_dist_2)
+        continue;
+
+      min_dist_2 = dist2;
+      min_idx = obs_idx;
     }
 
     if (min_idx != -1) {
@@ -132,7 +136,7 @@ static void nn_data_association(
  * @param map Map class containing map landmarks
  */
 void ParticleFilter::updateWeights(
-    Eigen::Matrix2d landmark_covariance_inverse,
+    Eigen::Matrix2d landmark_covariance,
     const std::vector<Eigen::Vector2d> &observed_landmarks,
     const std::vector<Eigen::Vector2d> &map_landmarks)
 {
@@ -147,9 +151,10 @@ void ParticleFilter::updateWeights(
 
   std::vector<bool> obs_is_associated;
   obs_is_associated.reserve(observed_landmarks.size());
+  best_associations.reserve(observed_landmarks.size());
 
   std::vector<std::tuple<int, int, double>> associations;
-  associations.reserve(std::min(n_map, n_obs));
+  associations.reserve(n_ass_max);
 
   double best_particle_weight = -1000;
   size_t best_particle_idx = -1;
@@ -175,7 +180,11 @@ void ParticleFilter::updateWeights(
     */
     double weight = 1.0;
     for (auto ass : associations)
-      weight *= std::exp(-std::get<2>(ass));
+      weight *= gauss::multivariate_gauss_pdf(
+        transformed_observations[std::get<0>(ass)],
+        map_landmarks[std::get<1>(ass)],
+        landmark_covariance
+      );
 
     size_t invalid_ass_count = n_ass_max - associations.size();
 
@@ -196,8 +205,7 @@ void ParticleFilter::updateWeights(
       best_particle_idx = i;
 
       // Store the associations, this might be the best particle and we want to render them
-      best_associations.clear();
-      best_associations.insert(best_associations.begin(), associations.cbegin(), associations.cend());
+      best_associations.swap(associations);
     }
   }
 
