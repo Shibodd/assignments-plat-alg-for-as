@@ -23,7 +23,7 @@ using namespace lidar_obstacle_detection;
 /*
  * PARAMETERS
  */
-#define NPARTICLES 2000
+#define NPARTICLES 1000
 Eigen::Vector3d sigma_init(0, 0, 0);         //[x,y,theta] initialization noise.
 Eigen::Vector3d sigma_pos(0.05, 0.05, 0.05); //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
 Eigen::Vector2d sigma_landmark(0.4, 0.4);    //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
@@ -102,10 +102,10 @@ void updateViewerBestAssociations(const std::vector<Eigen::Vector2d> &observed_l
   // Add new lines
   int i = 0;
   for (auto ass : pf.best_associations) {
-    const auto& obs = observed_landmarks[ass.first];
-    const auto& map = map_landmarks[ass.second];
+    const auto& obs = observed_landmarks[std::get<0>(ass)];
+    const auto& map = map_landmarks[std::get<1>(ass)];
 
-    renderer.AddLine(assID + std::to_string(i), pcl::PointXYZ(obs.x(), obs.y(), 0), pcl::PointXYZ(map.x(), map.y(), 0), COLOR_ASSOC, 0.7);
+    renderer.AddLine(assID + std::to_string(i), pcl::PointXYZ(obs.x(), obs.y(), 0), pcl::PointXYZ(map.x(), map.y(), 0), COLOR_ASSOC, std::get<2>(ass));
     ++i;
   }
 }

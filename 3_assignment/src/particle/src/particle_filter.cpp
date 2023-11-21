@@ -89,28 +89,41 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
   }
 }
 
-static void assignment_cost_matrix(
+static void nn_data_association(
     const std::vector<Eigen::Vector2d> &observations,
-    const std::vector<Eigen::Vector2d> &map,
-    const Eigen::Matrix2d& covariance_inverse,
-    Eigen::MatrixXd& ans)
-{
-  TRACE_FN_SCOPE;
+    const std::vector<Eigen::Vector2d> &maps,
+    std::vector<std::tuple<int, int>>& associations,
+    std::vector<bool>& obs_is_associated
+) {
+  constexpr double INVALID_ASS_DIST_THRESHOLD = 3;
+  constexpr double THR = INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
 
-  int obs_count = observations.size();
-  int map_count = map.size();
+  associations.clear();
+  obs_is_associated.clear();
+  obs_is_associated.resize(observations.size(), false);
 
-  // Compute each element of the cost matrix
-  for (size_t obs_idx = 0; obs_idx < obs_count; ++obs_idx)
-  {
-    for (size_t map_idx = 0; map_idx < map_count; ++map_idx)
-    {
-      Eigen::Vector2d delta = observations[obs_idx] - map[map_idx];
-      ans(obs_idx, map_idx) = delta.dot(delta);
+  // Find the nearest neighbouring observation for each map landmark
+  for (size_t map_idx = 0; map_idx < maps.size(); ++map_idx) {
+    auto& map = maps[map_idx];
+    double min_dist_2 = std::numeric_limits<double>().min();
+    size_t min_idx = -1;
+
+    for (size_t obs_idx = 0; obs_idx < observations.size(); ++obs_idx) {
+      auto& obs = observations[obs_idx];
+      double dist2 = (obs - map).squaredNorm();
+
+      if (dist2 < THR && dist2 < min_dist_2) {
+        min_dist_2 = dist2;
+        min_idx = obs_idx;
+      }
+    }
+
+    if (min_idx != -1) {
+      obs_is_associated[min_idx] = true;
+      associations.emplace_back(min_idx, map_idx, min_dist_2);
     }
   }
 }
-
 
 /**
  * @brief Updates the weights for each particle based on the likelihood of the likelihood of the observed measurements.
@@ -128,11 +141,14 @@ void ParticleFilter::updateWeights(
 
   size_t n_obs = observed_landmarks.size();
   size_t n_map = map_landmarks.size();
+  size_t n_ass_max = std::min(n_obs, n_map);
 
   std::vector<Eigen::Vector2d> transformed_observations(n_obs);
-  Eigen::MatrixXd association_costs(n_obs, n_map);
 
-  std::vector<std::pair<int, int>> associations;
+  std::vector<bool> obs_is_associated;
+  obs_is_associated.reserve(observed_landmarks.size());
+
+  std::vector<std::tuple<int, int, double>> associations;
   associations.reserve(std::min(n_map, n_obs));
 
   double best_particle_weight = -1000;
@@ -146,22 +162,7 @@ void ParticleFilter::updateWeights(
     for (size_t i = 0; i < n_obs; ++i)
       transformed_observations[i] = l2g_transform * observed_landmarks[i];
 
-    // Compute the cost matrix
-    assignment_cost_matrix(transformed_observations, map_landmarks, landmark_covariance_inverse, association_costs);
-
-    // Associate the observations to landmarks
-    lsap::solve(association_costs, associations);
-    
-    // Remove invalid associations
-    auto invalid_ass_begin = std::remove_if(associations.begin(), associations.end(),
-      [association_costs] (std::pair<int, int> ass) {
-        constexpr double INVALID_ASS_DIST_THRESHOLD = 3;
-        return association_costs(ass.first, ass.second) > INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
-      }
-    );
-    auto invalid_ass_end = associations.end();
-    size_t invalid_ass_count = std::distance(invalid_ass_begin, invalid_ass_end);
-    associations.erase(invalid_ass_begin, invalid_ass_end);
+    nn_data_association(transformed_observations, map_landmarks, associations, obs_is_associated);
 
     /* 
       The new weight is the product of each measurement’s probability density
@@ -174,7 +175,9 @@ void ParticleFilter::updateWeights(
     */
     double weight = 1.0;
     for (auto ass : associations)
-      weight *= std::exp(-association_costs(ass.first, ass.second));
+      weight *= std::exp(-std::get<2>(ass));
+
+    size_t invalid_ass_count = n_ass_max - associations.size();
 
     /*
     Also, what happens if we have unassociated map landmarks (the particle doesn't see them)?

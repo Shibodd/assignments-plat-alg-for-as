@@ -35,7 +35,7 @@ class ParticleFilter {
 public:
 
 	// Associations for the best particle
-	std::vector<std::pair<int, int>> best_associations; 
+	std::vector<std::tuple<int, int, double>> best_associations; 
 	
 	// Set of current particles
 	std::vector<Particle> particles;
