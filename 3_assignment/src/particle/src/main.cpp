@@ -67,7 +67,7 @@ void update_drawn_particles(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std
 void updateViewerReflector(const Eigen::Matrix2Xd &observed_landmarks)
 {
   TRACE_FN_SCOPE;
-  static const logging::Logger logger("updateViewerReflector");
+  MAKE_FN_LOGGER;
 
   // Visualize the reflectors the LiDAR sees
   for (Eigen::Index i = 0; i < observed_landmarks.cols(); i++)
@@ -184,9 +184,8 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
 
 int main(int argc, char **argv)
 {
-  static const logging::Logger logger("main");
-
   TRACE_FN_SCOPE;
+  MAKE_FN_LOGGER;
   
   logging::setLogLevel(logging::LogLevel::Debug);
 

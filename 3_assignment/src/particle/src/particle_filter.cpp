@@ -74,7 +74,7 @@ void ParticleFilter::init(Eigen::Vector3d state_guess, Eigen::Vector3d stddev, i
 void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double speed, double yaw_rate)
 {
   TRACE_FN_SCOPE;
-  static const logging::Logger logger("prediction");
+  MAKE_FN_LOGGER;
 
   auto dist = make_vector_distribution<std::normal_distribution, double>(Eigen::Vector3d(0, 0, 0), state_noise);
 
@@ -145,7 +145,6 @@ void ParticleFilter::updateWeights(
     const Eigen::Matrix2Xd &map_landmarks)
 {
   TRACE_FN_SCOPE;
-  MAKE_FN_LOGGER;
 
   Eigen::Index n_obs = observed_landmarks.cols();
   Eigen::Index n_map = map_landmarks.cols();
@@ -167,13 +166,9 @@ void ParticleFilter::updateWeights(
     
     // Transform observations from local space to global space
     auto l2g_transform = particle.local2global<double>();
-    logger.debug("Transform");
     auto transformed_observations = stackedvec::apply_transform(l2g_transform, observed_landmarks);
 
-    logger.debug("Associate");
     nn_data_association(transformed_observations, map_landmarks, associations, obs_is_associated);
-
-    logger.debug("Something else");
     /* 
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
