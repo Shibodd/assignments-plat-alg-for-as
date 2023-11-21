@@ -12,6 +12,7 @@
 #include "rectangular_lsap.hpp"
 #include "gauss.hpp"
 #include "stacked_vectors.hpp"
+#include "config.hpp"
 
 #include "logging.hpp"
 
@@ -98,9 +99,6 @@ static void nn_data_association(
 ) {
   TRACE_FN_SCOPE;
 
-  constexpr double INVALID_ASS_DIST_THRESHOLD = 3;
-  constexpr double THR = INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
-
   Eigen::Index n_map = maps.cols();
   Eigen::Index n_obs = observations.cols();
 
@@ -119,7 +117,7 @@ static void nn_data_association(
         continue;
 
       double dist2 = (observations.col(obs_idx) - map).squaredNorm();
-      if (dist2 >= THR || dist2 > min_dist_2)
+      if (dist2 >= cfg.association_max_distance_2 || dist2 > min_dist_2)
         continue;
 
       min_dist_2 = dist2;
@@ -189,8 +187,7 @@ void ParticleFilter::updateWeights(
     
     Important: this way we penalize invalid associations!
     */
-    constexpr double INVALID_ASSOCIATION_PROBABILITY = 0.1;
-    weight *= std::pow(INVALID_ASSOCIATION_PROBABILITY, invalid_ass_count);
+    weight *= std::pow(cfg.invalid_association_probability, invalid_ass_count);
 
     particle.weight = weight;
 

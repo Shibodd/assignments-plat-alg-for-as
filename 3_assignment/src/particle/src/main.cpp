@@ -13,21 +13,16 @@
 
 #include "logging.hpp"
 #include "stacked_vectors.hpp"
-
 #include "particle/particle_filter.h"
+
+#include "config.hpp"
+#include "config_parse.hpp"
+
 #define bestpID "bestp_id"
 #define reflectorID "reflector_id"
 #define assID "ass_id"
 
 using namespace lidar_obstacle_detection;
-
-/*
- * PARAMETERS
- */
-#define NPARTICLES 1000
-Eigen::Vector3d sigma_init(0, 0, 0);         //[x,y,theta] initialization noise.
-Eigen::Vector3d sigma_pos(0.05, 0.05, 0.05); //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
-Eigen::Vector2d sigma_landmark(0.4, 0.4);    //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
 
 static constexpr Color COLOR_PCL(0.1, 0.1, 0.1); // dark gray
 static constexpr Color COLOR_PARTICLE(1, 0, 0); // red
@@ -127,8 +122,10 @@ void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
   double dt = std::chrono::duration<double>(t_now - t_last).count();
 
   // If we have a "last time"
-  if (t_last.time_since_epoch().count() > 0)
-    pf.prediction(dt, sigma_pos, -speed, yaw_rate);
+  if (t_last.time_since_epoch().count() > 0) {
+    double noise_mul = cfg.dynamic_sigma_pos_gain * (1 - pf.best_particle().weight);
+    pf.prediction(dt, cfg.sigma_pos * noise_mul, -speed, yaw_rate);
+  }
 
   t_last = t_now;
 }
@@ -180,8 +177,6 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   renderer.SpinViewerOnce();
 }
 
-
-
 int main(int argc, char **argv)
 {
   TRACE_FN_SCOPE;
@@ -191,9 +186,16 @@ int main(int argc, char **argv)
 
   logger.info("Starting.");
 
+  logger.info("Starting ROS node.");
+  ros::init(argc, argv, "Particle");
+  ros::NodeHandle n;
+
+  logger.info("Parsing config.");
+  load_config(n);
+
   landmark_covariance << 
-      sigma_landmark.x(), 0,
-      0, sigma_landmark.y();
+      cfg.sigma_landmark.x(), 0,
+      0, cfg.sigma_landmark.y();
   
   logger.info("Loading reflectors.");
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudReflectors(new pcl::PointCloud<pcl::PointXYZ>);
@@ -229,13 +231,11 @@ int main(int argc, char **argv)
     renderer.addCircle(0, 0, reflectorID + std::to_string(i), 0.2, COLOR_OBS_REFLECTOR);
 
   // Initial position of the forklift
-  double GPS_x = 2.37256;
-  double GPS_y = 1.70077;
-  double GPS_theta = -1.68385;
+  
 
   // Init the particle filter
-  pf.init(Eigen::Vector3d(GPS_x, GPS_y, GPS_theta), sigma_init, NPARTICLES);
-  // pf.init_random(Eigen::Vector2d(-2.0, -2.0), Eigen::Vector2d(2.0, 2.0), NPARTICLES);
+  pf.init(cfg.initial_state, cfg.sigma_init, cfg.n_particles);
+  // pf.init_random(cfg.min_initial_position, cfg.max_initial_position, cfg.n_particles);
 
   // Render all the particles
   for (int i = 0; i < pf.particles.size(); i++)
@@ -249,16 +249,12 @@ int main(int argc, char **argv)
   renderer.RenderPointCloud(cloud_particles, "particles", COLOR_PARTICLE);
 
   // render the best initial guess as a circle
-  renderer.addCircle(GPS_x, GPS_y, bestpID, 0.4, COLOR_BESTP);
+  renderer.addCircle(cfg.initial_state.x(), cfg.initial_state.y(), bestpID, 0.4, COLOR_BESTP);
   renderer.SpinViewerOnce();
 
   // Start ROS node
   logger.info("Creating result file.");
   myfile.open("./res.txt", std::ios_base::app);
-
-  logger.info("Starting ROS node.");
-  ros::init(argc, argv, "Particle");
-  ros::NodeHandle n;
 
   // Subscriber
   ros::Subscriber odom_sub = n.subscribe<nav_msgs::Odometry>("/auriga_id0_odom", 1, &OdomCb);             // average rate: 31.438hz
