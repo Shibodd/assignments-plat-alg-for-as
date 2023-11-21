@@ -172,11 +172,6 @@ void ParticleFilter::updateWeights(
     /* 
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
-
-      But that's slow and the covariance is invariant across particles
-      - so just mimick it with the euclidean distance instead.
-      
-      We already computed them in association_costs.
     */
     double weight = 1.0;
     for (auto ass : associations)
@@ -191,7 +186,8 @@ void ParticleFilter::updateWeights(
     /*
     Also, what happens if we have unassociated map landmarks (the particle doesn't see them)?
     Use an heuristic: assume the probability of not seeing a landmark is constant.
-    Penalize invalid associations.
+    
+    Important: this way we penalize invalid associations!
     */
     constexpr double INVALID_ASSOCIATION_PROBABILITY = 0.1;
     weight *= std::pow(INVALID_ASSOCIATION_PROBABILITY, invalid_ass_count);
