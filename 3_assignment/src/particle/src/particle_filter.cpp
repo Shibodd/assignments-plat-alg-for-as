@@ -11,6 +11,7 @@
 #include "vector_distribution.hpp"
 #include "rectangular_lsap.hpp"
 #include "gauss.hpp"
+#include "stacked_vectors.hpp"
 
 #include "logging.hpp"
 
@@ -90,8 +91,8 @@ void ParticleFilter::prediction(double dt, Eigen::Vector3d state_noise, double s
 }
 
 static void nn_data_association(
-    const std::vector<Eigen::Vector2d> &observations,
-    const std::vector<Eigen::Vector2d> &maps,
+    const Eigen::Matrix2Xd &observations,
+    const Eigen::Matrix2Xd &maps,
     std::vector<std::tuple<int, int, double>>& associations,
     std::vector<bool>& obs_is_associated
 ) {
@@ -100,21 +101,24 @@ static void nn_data_association(
   constexpr double INVALID_ASS_DIST_THRESHOLD = 3;
   constexpr double THR = INVALID_ASS_DIST_THRESHOLD * INVALID_ASS_DIST_THRESHOLD;
 
+  Eigen::Index n_map = maps.cols();
+  Eigen::Index n_obs = observations.cols();
+
   associations.clear();
   obs_is_associated.clear();
-  obs_is_associated.resize(observations.size(), false);
+  obs_is_associated.resize(n_obs, false);
 
   // Find the nearest neighbouring observation for each map landmark
-  for (size_t map_idx = 0; map_idx < maps.size(); ++map_idx) {
-    auto& map = maps[map_idx];
+  for (Eigen::Index map_idx = 0; map_idx < maps.cols(); ++map_idx) {
+    auto& map = maps.col(map_idx);
     double min_dist_2 = std::numeric_limits<double>().max();
     size_t min_idx = -1;
-
-    for (size_t obs_idx = 0; obs_idx < observations.size(); ++obs_idx) {
+    
+    for (Eigen::Index obs_idx = 0; obs_idx < n_obs; ++obs_idx) {
       if (obs_is_associated[obs_idx])
         continue;
 
-      double dist2 = (observations[obs_idx] - map).squaredNorm();
+      double dist2 = (observations.col(obs_idx) - map).squaredNorm();
       if (dist2 >= THR || dist2 > min_dist_2)
         continue;
 
@@ -137,24 +141,22 @@ static void nn_data_association(
  */
 void ParticleFilter::updateWeights(
     Eigen::Matrix2d landmark_covariance,
-    const std::vector<Eigen::Vector2d> &observed_landmarks,
-    const std::vector<Eigen::Vector2d> &map_landmarks)
+    const Eigen::Matrix2Xd &observed_landmarks,
+    const Eigen::Matrix2Xd &map_landmarks)
 {
   TRACE_FN_SCOPE;
   MAKE_FN_LOGGER;
 
-  size_t n_obs = observed_landmarks.size();
-  size_t n_map = map_landmarks.size();
-  size_t n_ass_max = std::min(n_obs, n_map);
-
-  std::vector<Eigen::Vector2d> transformed_observations(n_obs);
+  Eigen::Index n_obs = observed_landmarks.cols();
+  Eigen::Index n_map = map_landmarks.cols();
+  Eigen::Index n_ass_max = std::min(n_obs, n_map);
 
   std::vector<bool> obs_is_associated;
-  obs_is_associated.reserve(observed_landmarks.size());
-  best_associations.reserve(observed_landmarks.size());
+  obs_is_associated.reserve(n_obs);
 
   std::vector<std::tuple<int, int, double>> associations;
   associations.reserve(n_ass_max);
+  best_associations.reserve(n_ass_max);
 
   double best_particle_weight = -1000;
   size_t best_particle_idx = -1;
@@ -162,13 +164,16 @@ void ParticleFilter::updateWeights(
   for (size_t i = 0; i < particles.size(); ++i)
   {
     auto& particle = particles[i];
+    
     // Transform observations from local space to global space
     auto l2g_transform = particle.local2global<double>();
-    for (size_t i = 0; i < n_obs; ++i)
-      transformed_observations[i] = l2g_transform * observed_landmarks[i];
+    logger.debug("Transform");
+    auto transformed_observations = stackedvec::apply_transform(l2g_transform, observed_landmarks);
 
+    logger.debug("Associate");
     nn_data_association(transformed_observations, map_landmarks, associations, obs_is_associated);
 
+    logger.debug("Something else");
     /* 
       The new weight is the product of each measurement’s probability density
       in its associated map-centered Multivariate-Gaussian.
@@ -176,8 +181,8 @@ void ParticleFilter::updateWeights(
     double weight = 1.0;
     for (auto ass : associations)
       weight *= gauss::multivariate_gauss_pdf(
-        transformed_observations[std::get<0>(ass)],
-        map_landmarks[std::get<1>(ass)],
+        transformed_observations.col(std::get<0>(ass)).eval(),
+        map_landmarks.col(std::get<1>(ass)).eval(),
         landmark_covariance
       );
 

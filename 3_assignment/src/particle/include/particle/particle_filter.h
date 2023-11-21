@@ -80,8 +80,8 @@ public:
 	 */
 	void updateWeights(
     Eigen::Matrix2d landmark_covariance,
-    const std::vector<Eigen::Vector2d> &observed_landmarks,
-    const std::vector<Eigen::Vector2d> &map_landmarks);
+    const Eigen::Matrix2Xd &observed_landmarks,
+    const Eigen::Matrix2Xd &map_landmarks);
 	
 	/**
 	 * resample Resamples from the updated set of particles to form

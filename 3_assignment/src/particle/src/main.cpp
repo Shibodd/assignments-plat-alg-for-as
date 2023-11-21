@@ -12,6 +12,7 @@
 #include <Eigen/Dense>
 
 #include "logging.hpp"
+#include "stacked_vectors.hpp"
 
 #include "particle/particle_filter.h"
 #define bestpID "bestp_id"
@@ -38,7 +39,7 @@ static constexpr Color COLOR_ASSOC(0, 1, 0); // green (lower opacity)
 std::ofstream myfile;
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
 Eigen::Matrix2d landmark_covariance;
-std::vector<Eigen::Vector2d> map_landmarks;
+Eigen::Matrix2Xd map_landmarks;
 Renderer renderer;
 ParticleFilter pf;
 
@@ -63,15 +64,15 @@ void update_drawn_particles(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const std
 /**
  * @brief Show the reflectors in the frame of reference of the best particle
  */
-void updateViewerReflector(const std::vector<Eigen::Vector2d> &observed_landmarks)
+void updateViewerReflector(const Eigen::Matrix2Xd &observed_landmarks)
 {
   TRACE_FN_SCOPE;
   static const logging::Logger logger("updateViewerReflector");
 
   // Visualize the reflectors the LiDAR sees
-  for (int i = 0; i < observed_landmarks.size(); i++)
+  for (Eigen::Index i = 0; i < observed_landmarks.cols(); i++)
   {
-    auto& pos = observed_landmarks[i];
+    auto& pos = observed_landmarks.col(i);
 
     // Update the pose of the reflectors
     Eigen::Affine3f transform(Eigen::Translation3f(pos.x(), pos.y(), 0));
@@ -80,20 +81,20 @@ void updateViewerReflector(const std::vector<Eigen::Vector2d> &observed_landmark
   }
 
   // Hide the unseen reflectors
-  for (int i = observed_landmarks.size(); i < nReflectors; i++)
+  for (int i = observed_landmarks.cols(); i < nReflectors; i++)
     renderer.updateShape(reflectorID + std::to_string(i), 0.0);
 }
 
 /**
  * @brief Renders the assocations of the best particle.
 */
-void updateViewerBestAssociations(const std::vector<Eigen::Vector2d> &observed_landmarks) {
+void updateViewerBestAssociations(const Eigen::Matrix2Xd &observed_landmarks) {
   TRACE_FN_SCOPE;
 
   static bool created = false;
   if (created) {
     // Remove old lines
-    for (int i = 0; i < map_landmarks.size(); ++i) {
+    for (Eigen::Index i = 0; i < map_landmarks.cols(); ++i) {
       renderer.removeShape(assID + std::to_string(i));
     }
   }
@@ -102,8 +103,8 @@ void updateViewerBestAssociations(const std::vector<Eigen::Vector2d> &observed_l
   // Add new lines
   int i = 0;
   for (auto ass : pf.best_associations) {
-    const auto& obs = observed_landmarks[std::get<0>(ass)];
-    const auto& map = map_landmarks[std::get<1>(ass)];
+    const auto& obs = observed_landmarks.col(std::get<0>(ass));
+    const auto& map = map_landmarks.col(std::get<1>(ass));
 
     renderer.AddLine(assID + std::to_string(i), pcl::PointXYZ(obs.x(), obs.y(), 0), pcl::PointXYZ(map.x(), map.y(), 0), COLOR_ASSOC, 0.7);
     ++i;
@@ -146,21 +147,20 @@ void PointCloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   pcl::fromROSMsg(*cloud_msg, *cloud);
 
   // Extract landmarks
-  std::vector<Eigen::Vector2d> observed_landmarks = extractReflectors(cloud);
+  Eigen::Matrix2Xd observed_landmarks_local = stackedvec::hstack(extractReflectors(cloud));
 
   // Update the particle weights
-  pf.updateWeights(landmark_covariance, observed_landmarks, map_landmarks);
+  pf.updateWeights(landmark_covariance, observed_landmarks_local, map_landmarks);
 
   // Transform all observations from best particle local space to global space
   auto l2g_transform = pf.best_particle().local2global<double>();
-  for (size_t i = 0; i < observed_landmarks.size(); ++i)
-    observed_landmarks[i] = l2g_transform * observed_landmarks[i];
+  Eigen::Matrix2Xd observed_landmarks_global = stackedvec::apply_transform(l2g_transform, observed_landmarks_local);
 
   // Show the reflectors in the frame of reference of the best particle
-  updateViewerReflector(observed_landmarks);
+  updateViewerReflector(observed_landmarks_global);
 
   // Show the associations of the best particle
-  updateViewerBestAssociations(observed_landmarks);
+  updateViewerBestAssociations(observed_landmarks_global);
 
   // Show the particles in the map
   update_drawn_particles(cloud_particles, pf.particles);
@@ -199,7 +199,7 @@ int main(int argc, char **argv)
   logger.info("Loading reflectors.");
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudReflectors(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::io::loadPCDFile("./data/map_reflector.pcd", *cloudReflectors); // cloud with just the reflectors
-  map_landmarks = createMap(cloudReflectors);
+  map_landmarks = stackedvec::hstack(createMap(cloudReflectors));
 
   logger.info("Loading base cloud.");
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudMap(new pcl::PointCloud<pcl::PointXYZ>);
