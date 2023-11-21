@@ -230,12 +230,12 @@ int main(int argc, char **argv)
   for (int i = 0; i < nReflectors; i++)
     renderer.addCircle(0, 0, reflectorID + std::to_string(i), 0.2, COLOR_OBS_REFLECTOR);
 
-  // Initial position of the forklift
-  
-
   // Init the particle filter
-  pf.init(cfg.initial_state, cfg.sigma_init, cfg.n_particles);
-  // pf.init_random(cfg.min_initial_position, cfg.max_initial_position, cfg.n_particles);
+  if (cfg.random_initialization) {
+    pf.init_random(cfg.min_initial_position, cfg.max_initial_position, cfg.n_particles);
+  } else {
+    pf.init(cfg.initial_state, cfg.sigma_init, cfg.n_particles);
+  }
 
   // Render all the particles
   for (int i = 0; i < pf.particles.size(); i++)
@@ -252,7 +252,6 @@ int main(int argc, char **argv)
   renderer.addCircle(cfg.initial_state.x(), cfg.initial_state.y(), bestpID, 0.4, COLOR_BESTP);
   renderer.SpinViewerOnce();
 
-  // Start ROS node
   logger.info("Creating result file.");
   myfile.open("./res.txt", std::ios_base::app);
 
