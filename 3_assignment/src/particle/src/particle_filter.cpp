@@ -208,13 +208,45 @@ void ParticleFilter::updateWeights(
   best_particle_idx_ = best_particle_idx;
 }
 
-
-
-
-static inline void naive_wheel_resampling(ParticleFilter& pf) {
+static inline void systematic_resampling(ParticleFilter& pf)
+{
   double total_weight = 0.0;
   for (const auto& particle : pf.particles)
     total_weight += particle.weight;
+
+  auto pit = pf.particles.begin();
+  auto end = pf.particles.end();
+  
+  std::vector<Particle> new_particles;
+  new_particles.reserve(pf.particles.size());
+
+  double step = total_weight / pf.particles.size();
+  double x = std::uniform_real_distribution<double>(0, step)(gen);
+  double cumsum = (*pit).weight;
+
+  while (new_particles.size() != pf.particles.size())
+  {
+    while (cumsum < x)
+      cumsum += (*++pit).weight;
+    
+    new_particles.push_back(*pit);
+    x += step;
+  }
+  
+  pf.particles.swap(new_particles);
+}
+
+void ParticleFilter::resample()
+{
+  TRACE_FN_SCOPE;
+  systematic_resampling(*this);
+}
+
+
+
+/*
+
+static inline void naive_wheel_resampling(ParticleFilter& pf) {
 
   std::vector<Particle> new_particles;
   new_particles.reserve(pf.particles.size());
@@ -237,8 +269,4 @@ static inline void naive_wheel_resampling(ParticleFilter& pf) {
   pf.particles.swap(new_particles);
 }
 
-void ParticleFilter::resample()
-{
-  TRACE_FN_SCOPE;
-  naive_wheel_resampling(*this);
-}
+*/
