@@ -32,12 +32,12 @@ static void load_config(const ros::NodeHandle& node) {
   PARAM_SCALAR_(n_particles, 1000);
   PARAM_SCALAR_(random_initialization, false);
 
-  PARAM_VECTOR3(sigma_pos, Eigen::Vector3d(0.05, 0.05, 0.05));
-  PARAM_SCALAR_(dynamic_sigma_pos_gain, 10.0);
+  PARAM_VECTOR3(sigma_pos, Eigen::Vector3d(0.01, 0.01, 0.01));
+  PARAM_SCALAR_(dynamic_sigma_pos_gain, 50.0);
   PARAM_VECTOR2(sigma_landmark, Eigen::Vector2d(0.4, 0.4));
 
-  PARAM_SCALAR_(association_max_distance_2, 9.0);
-  PARAM_SCALAR_(invalid_association_probability, 0.001);
+  PARAM_SCALAR_(association_max_distance_2, 2.0);
+  PARAM_SCALAR_(invalid_association_probability, 1e-5);
 }
 #undef PARAM
 

@@ -123,7 +123,7 @@ void OdomCb(const nav_msgs::Odometry::ConstPtr &msg)
 
   // If we have a "last time"
   if (t_last.time_since_epoch().count() > 0) {
-    double noise_mul = cfg.dynamic_sigma_pos_gain * (1 - pf.best_particle().weight);
+    double noise_mul = 1 + cfg.dynamic_sigma_pos_gain * (1 - pf.best_particle().weight);
     pf.prediction(dt, cfg.sigma_pos * noise_mul, -speed, yaw_rate);
   }
 
