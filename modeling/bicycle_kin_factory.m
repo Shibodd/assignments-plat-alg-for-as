@@ -1,4 +1,4 @@
-function xdot_fn = bicycle_kin_glob_factory(lf, lr)
+function xdot_fn = bicycle_kin_factory(lf, lr)
     wheelbase = lf + lr;
 
     function xdot_fn = bicycle_kin_glob(t, state, inputs)
