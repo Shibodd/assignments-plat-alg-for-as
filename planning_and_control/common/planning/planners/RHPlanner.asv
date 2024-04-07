@@ -1,0 +1,26 @@
+classdef RHPlanner < Planner
+    properties
+        Obstacles
+        SafetyDistance
+        UMax
+        Horizon
+        ReferencePath
+        RefPathBoundsPP
+    end
+    methods
+        function path = get_path(obj, position, angle, ds)
+            x0 = obj.ReferencePath.deviation(position, angle);
+            s0 = obj.ReferencePath.arc(position);
+
+            s = s0 + ds * (0:Horizon);
+
+
+
+            optimizer = optimizer_factory(sys, obj.UMax, obj.Horizon);
+            frenet_obs = frenet_obstacles(obj.Obstacles, path_positions, path_normals, safety_dist);
+            bounds = boundgen(frenet_obs, lmin, lmax);
+            paths = bounds_to_paths(bounds);
+            [us, path_i] = best_path_planner(optimizer, x0, tgt_l, phidotdes, paths);
+        end
+    end
+end
